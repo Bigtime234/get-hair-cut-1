@@ -16,6 +16,7 @@ export async function getAvailableSlots(
 ): Promise<{ success: TimeSlot[] } | { error: string }> {
   try {
     const selectedDate = new Date(date)
+    // Fix: Ensure lowercase day name matching your enum
     const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase() as 
       'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
 
@@ -27,8 +28,10 @@ export async function getAvailableSlots(
       ),
     })
 
-    if (!workingHour) {
-      return { success: [] } // No working hours for this day
+    // If no working hours found, use default hours (means database is empty)
+    const hours = workingHour || {
+      startTime: dayName === 'sunday' ? '10:00' : '09:00',
+      endTime: dayName === 'sunday' ? '16:00' : (dayName === 'saturday' ? '17:00' : '18:00')
     }
 
     // Check if the entire day is blocked
@@ -51,18 +54,22 @@ export async function getAvailableSlots(
       ),
     })
 
+    // Fix: Create proper date range without mutating selectedDate
+    const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0, 0)
+    const endOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59, 999)
+
     // Get all existing bookings for this date
     const existingBookings = await db.query.bookings.findMany({
       where: and(
-        gte(bookings.appointmentDate, new Date(selectedDate.setHours(0, 0, 0, 0))),
-        lte(bookings.appointmentDate, new Date(selectedDate.setHours(23, 59, 59, 999)))
+        gte(bookings.appointmentDate, startOfDay),
+        lte(bookings.appointmentDate, endOfDay)
       ),
     })
 
     // Generate time slots
     const timeSlots: TimeSlot[] = []
-    const startTime = parseTime(workingHour.startTime)
-    const endTime = parseTime(workingHour.endTime)
+    const startTime = parseTime(hours.startTime)
+    const endTime = parseTime(hours.endTime)
     
     // Create 30-minute intervals
     const slotInterval = 30 // minutes
@@ -98,8 +105,8 @@ export async function getAvailableSlots(
 
       // Don't allow booking in the past
       const now = new Date()
-      const slotDateTime = new Date(selectedDate)
-      slotDateTime.setHours(Math.floor(currentTime / 60), currentTime % 60, 0, 0)
+      const slotDateTime = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 
+                                   Math.floor(currentTime / 60), currentTime % 60, 0, 0)
       const isPast = slotDateTime <= now
 
       let available = true

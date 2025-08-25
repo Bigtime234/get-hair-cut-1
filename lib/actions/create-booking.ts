@@ -213,7 +213,7 @@ export async function createBookingAction(data: FormBookingData) {
     return { 
       success: true, 
       bookingId: result.success.bookingId,
-      redirectUrl: `/booking/processing?bookingId=${result.success.bookingId}`
+      redirectUrl: `/booking-processing?bookingId=${result.success.bookingId}`
     }
 
   } catch (error) {
