@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Copy, Check, Scissors, Phone, Mail } from "lucide-react"
 import { confirmPaymentAndSendEmails, confirmPaymentManual } from "@/lib/actions/enhanced-create-booking"
+import { toast } from "sonner" 
 
 type SimpleCashappBannerProps = {
   serviceName: string
@@ -38,6 +39,9 @@ export default function SimpleCashappBanner({
       setProcessing(true)
       console.log("Starting payment confirmation for booking:", bookingId)
       
+      // Show processing toast
+      toast.info("Your booking is being processed...")
+      
       // First try the relations-based version
       let result = await confirmPaymentAndSendEmails(bookingId)
       
@@ -49,16 +53,16 @@ export default function SimpleCashappBanner({
       
       if (result.error) {
         console.error("Payment confirmation error:", result.error)
-        alert(`Failed to confirm payment: ${result.error}`)
+        toast.error(`Failed to confirm payment: ${result.error}`)
         return
       }
 
       if (result.warning) {
         console.warn("Payment confirmation warning:", result.warning)
-        alert(`Payment confirmed with warning: ${result.warning}`)
+        toast.warning(`Payment confirmed with warning: ${result.warning}`)
       } else {
         console.log("Payment confirmed and emails sent successfully!")
-        alert("Payment confirmed! You should receive a confirmation email shortly.")
+        toast.success("Payment confirmed! You should receive a confirmation email shortly.")
       }
       
       // Call the original callback if provided
@@ -73,7 +77,7 @@ export default function SimpleCashappBanner({
       
     } catch (error) {
       console.error("Booking completion error:", error)
-      alert("Something went wrong. Please contact support or try again.")
+      toast.error("Something went wrong. Please contact support or try again.")
     } finally {
       setProcessing(false)
     }
