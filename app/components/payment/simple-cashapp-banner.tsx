@@ -1,20 +1,24 @@
 import { useState } from "react"
 import { Copy, Check, Scissors, Phone, Mail } from "lucide-react"
+import { confirmPaymentAndSendEmails, confirmPaymentManual } from "@/lib/actions/enhanced-create-booking"
 
-type BarberCashAppPaymentProps = {
+type SimpleCashappBannerProps = {
   serviceName: string
   servicePrice: string
-  onCompleteBookingAction: () => Promise<void>
+  bookingId: string
+  onCompleteBookingAction?: () => Promise<void>
   isProcessing?: boolean
 }
 
-export default function BarberCashAppPayment({ 
+export default function SimpleCashappBanner({ 
   serviceName, 
   servicePrice, 
+  bookingId,
   onCompleteBookingAction,
   isProcessing = false
-}: BarberCashAppPaymentProps) {
+}: SimpleCashappBannerProps) {
   const [copied, setCopied] = useState(false)
+  const [processing, setProcessing] = useState(false)
   
   const cashTag = "$HairCutzStudio"
   const displayName = "Hair Cutz Studio"
@@ -31,9 +35,47 @@ export default function BarberCashAppPayment({
 
   const handleCompleteBooking = async () => {
     try {
-      await onCompleteBookingAction()
+      setProcessing(true)
+      console.log("Starting payment confirmation for booking:", bookingId)
+      
+      // First try the relations-based version
+      let result = await confirmPaymentAndSendEmails(bookingId)
+      
+      // If relations don't work, try manual version
+      if (result.error && result.error.includes("relation")) {
+        console.log("Relations failed, trying manual approach...")
+        result = await confirmPaymentManual(bookingId)
+      }
+      
+      if (result.error) {
+        console.error("Payment confirmation error:", result.error)
+        alert(`Failed to confirm payment: ${result.error}`)
+        return
+      }
+
+      if (result.warning) {
+        console.warn("Payment confirmation warning:", result.warning)
+        alert(`Payment confirmed with warning: ${result.warning}`)
+      } else {
+        console.log("Payment confirmed and emails sent successfully!")
+        alert("Payment confirmed! You should receive a confirmation email shortly.")
+      }
+      
+      // Call the original callback if provided
+      if (onCompleteBookingAction) {
+        await onCompleteBookingAction()
+      }
+      
+      // Redirect to success page
+      setTimeout(() => {
+        window.location.href = `/booking-processing?bookingId=${bookingId}`
+      }, 2000)
+      
     } catch (error) {
       console.error("Booking completion error:", error)
+      alert("Something went wrong. Please contact support or try again.")
+    } finally {
+      setProcessing(false)
     }
   }
 
@@ -68,6 +110,10 @@ export default function BarberCashAppPayment({
           <div className="flex justify-between items-center py-2 border-b border-amber-200">
             <span className="text-slate-700 font-medium">Service</span>
             <span className="font-bold text-slate-900">{serviceName}</span>
+          </div>
+          <div className="flex justify-between items-center py-2 border-b border-amber-200">
+            <span className="text-slate-700 font-medium">Booking ID</span>
+            <span className="font-mono text-sm text-slate-600">#{bookingId}</span>
           </div>
           <div className="flex justify-between items-center py-2">
             <span className="text-slate-700 font-medium">Total Amount</span>
@@ -147,7 +193,7 @@ export default function BarberCashAppPayment({
               <li>Open your Cash App and tap "Send"</li>
               <li>Enter the exact amount: <strong>{servicePrice}</strong></li>
               <li>Send to: <strong>{cashTag}</strong></li>
-              <li>Add your name in the payment note</li>
+              <li>Add your booking ID #{bookingId} in the payment note</li>
             </ul>
           </div>
         </div>
@@ -156,13 +202,15 @@ export default function BarberCashAppPayment({
       {/* Complete Booking Button */}
       <button
         onClick={handleCompleteBooking}
-        disabled={isProcessing}
-        className="w-full bg-gradient-to-r from-amber-600 via-amber-600 to-yellow-600 hover:from-amber-700 hover:via-amber-700 hover:to-yellow-700 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+        disabled={processing || isProcessing}
+        className={`w-full bg-gradient-to-r from-amber-600 via-amber-600 to-yellow-600 hover:from-amber-700 hover:via-amber-700 hover:to-yellow-700 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
+          (processing || isProcessing) ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
       >
-        {isProcessing ? (
+        {(processing || isProcessing) ? (
           <div className="flex items-center justify-center gap-3">
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            <span>Processing Booking...</span>
+            <span>Processing Payment Confirmation...</span>
           </div>
         ) : (
           <div className="flex items-center justify-center gap-2">

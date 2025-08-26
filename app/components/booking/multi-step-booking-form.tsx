@@ -33,6 +33,7 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState<BookingStep>('customer-info')
   const [isLoading, setIsLoading] = useState(false)
+  const [bookingId, setBookingId] = useState<string>("")
   
   // Form data
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
@@ -67,8 +68,38 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
     setCurrentStep('review')
   }
 
-  const handleReviewNext = () => {
-    setCurrentStep('payment')
+  const handleReviewNext = async () => {
+    setIsLoading(true)
+    
+    try {
+      console.log('Creating booking with data:', {
+        serviceId: service.id,
+        customerInfo,
+        appointmentTime,
+      })
+
+      const result = await createEnhancedBookingAction({
+        serviceId: service.id,
+        customerInfo,
+        appointmentTime,
+      })
+
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+
+      if (result.success && result.bookingId) {
+        setBookingId(result.bookingId)
+        toast.success("Booking created! Please complete payment to confirm.")
+        setCurrentStep('payment')
+      }
+    } catch (error) {
+      console.error('Booking creation error:', error)
+      toast.error("Something went wrong. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleBack = () => {
@@ -87,38 +118,16 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
     }
   }
 
-  // Complete booking with enhanced action (includes email notifications)
+  // Complete booking after payment confirmation
   const handleCompleteBookingAction = async () => {
-    setIsLoading(true)
-    
-    try {
-      console.log('Submitting booking with data:', {
-        serviceId: service.id,
-        customerInfo,
-        appointmentTime,
-      })
-
-      const result = await createEnhancedBookingAction({
-        serviceId: service.id,
-        customerInfo,
-        appointmentTime,
-      })
-
-      if (result.error) {
-        toast.error(result.error)
-        return
-      }
-
-      if (result.success && result.redirectUrl) {
-        toast.success("Booking created successfully! Confirmation emails sent.")
-        router.push(result.redirectUrl)
-      }
-    } catch (error) {
-      console.error('Booking error:', error)
-      toast.error("Something went wrong. Please try again.")
-    } finally {
-      setIsLoading(false)
+    if (!bookingId) {
+      toast.error("Booking ID not found. Please try again.")
+      return
     }
+
+    // The SimpleCashAppBanner component will handle payment confirmation
+    // and redirect to success page
+    toast.success("Processing payment confirmation...")
   }
 
   // Step indicator
@@ -244,6 +253,7 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
             </CardHeader>
             <CardContent>
               <SimpleCashAppBanner
+                bookingId={bookingId}
                 serviceName={service.name}
                 servicePrice={formatPrice(service.price)}
                 onCompleteBookingAction={handleCompleteBookingAction}
