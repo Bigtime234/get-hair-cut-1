@@ -3,11 +3,12 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import CustomerInfoStep, { CustomerInfo } from "./customer-info-step"
-import AppointmentTimeStep, { AppointmentTime } from "./appointment-time-step"
+import CustomerInfoStep from "./customer-info-step"
+import AppointmentTimeStep from "./appointment-time-step"
 import ReviewStep from "./review-step"
 import SimpleCashAppBanner from "../payment/simple-cashapp-banner"
-import { createBookingAction } from "@/lib/actions/create-booking"
+import { createEnhancedBookingAction } from "@/lib/actions/enhanced-create-booking"
+import { CustomerInfo, AppointmentTime } from "@/Types/booking-schema"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar, CreditCard, CheckCircle, User } from "lucide-react"
@@ -86,12 +87,18 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
     }
   }
 
-  // Complete booking
+  // Complete booking with enhanced action (includes email notifications)
   const handleCompleteBookingAction = async () => {
     setIsLoading(true)
     
     try {
-      const result = await createBookingAction({
+      console.log('Submitting booking with data:', {
+        serviceId: service.id,
+        customerInfo,
+        appointmentTime,
+      })
+
+      const result = await createEnhancedBookingAction({
         serviceId: service.id,
         customerInfo,
         appointmentTime,
@@ -103,7 +110,7 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
       }
 
       if (result.success && result.redirectUrl) {
-        toast.success("Booking created successfully!")
+        toast.success("Booking created successfully! Confirmation emails sent.")
         router.push(result.redirectUrl)
       }
     } catch (error) {
@@ -229,8 +236,11 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-slate-800">
                 <CreditCard className="h-6 w-6 text-amber-600" />
-                Payment
+                Payment & Confirmation
               </CardTitle>
+              <p className="text-slate-600 mt-2">
+                Complete your payment to finalize the booking. You'll receive email confirmations once processed.
+              </p>
             </CardHeader>
             <CardContent>
               <SimpleCashAppBanner

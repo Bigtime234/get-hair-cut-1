@@ -136,7 +136,7 @@ export async function createBookingWithNotification(data: BookingData): Promise<
       // Admin notification email
       const adminEmailResult = await resend.emails.send({
         from: 'Booking System <noreply@yourbarber.com>',
-        to: 'admin@yourbarber.com', // Replace with your admin email
+        to: 'codebyriven@gmail.com', // Replace with your admin email
         subject: `📅 New Booking Request - ${service.name}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
@@ -272,10 +272,10 @@ export async function createEnhancedBookingAction(data: FormBookingData) {
       return { error: "Service not found" }
     }
 
-    // Create appointment datetime - appointmentTime.date is already a Date object
+    // Create appointment datetime
     const appointmentDateTime = new Date(data.appointmentTime.date)
     const [hours, minutes] = data.appointmentTime.time.split(':')
-    appointmentDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+    appointmentDateTime.setHours(parseInt(hours), parseInt(minutes))
 
     // Calculate end time
     const endTime = await calculateEndTime(data.appointmentTime.time, service.duration)
