@@ -62,9 +62,9 @@ export const dynamicParams = true
 export const revalidate = 3600 // Revalidate every hour
 
 interface BookingPageProps {
-  params: {
+  params: Promise<{
     serviceId: string
-  }
+  }>
 }
 
 // Loading component
@@ -223,9 +223,11 @@ async function BookingPageContent({ serviceId }: { serviceId: string }) {
   }
 }
 
-// Main page component
-export default function BookingPage({ params }: BookingPageProps) {
-  const { serviceId } = params
+// Main page component - FIXED: Now properly awaits params
+export default async function BookingPage({ params }: BookingPageProps) {
+  // CRITICAL FIX: Await the params promise
+  const resolvedParams = await params
+  const { serviceId } = resolvedParams
 
   return (
     <Suspense fallback={<BookingFormSkeleton />}>

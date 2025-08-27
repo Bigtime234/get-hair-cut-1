@@ -5,6 +5,7 @@ import { bookings, users, services } from "@/server/schema"
 import { eq } from "drizzle-orm"
 import { CustomerInfo, AppointmentTime } from "@/Types/booking-schema"
 import { Resend } from "resend"
+import { revalidatePath } from "next/cache"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -12,15 +13,34 @@ type CreateEnhancedBookingParams = {
   serviceId: string
   customerInfo: CustomerInfo
   appointmentTime: AppointmentTime
+  sessionUserId: string // This should be the database user CUID2
 }
 
 export async function createEnhancedBookingAction({
   serviceId,
   customerInfo,
   appointmentTime,
+  sessionUserId,
 }: CreateEnhancedBookingParams) {
   try {
-    console.log('Creating enhanced booking with:', { serviceId, customerInfo, appointmentTime })
+    console.log('Creating enhanced booking with:', { serviceId, customerInfo, appointmentTime, sessionUserId })
+
+    // Validate required fields
+    if (!sessionUserId) {
+      return { error: "User session is required. Please log in and try again." }
+    }
+
+    if (!serviceId) {
+      return { error: "Service ID is required." }
+    }
+
+    if (!customerInfo.email) {
+      return { error: "Email is required." }
+    }
+
+    if (!appointmentTime.date || !appointmentTime.time) {
+      return { error: "Appointment date and time are required." }
+    }
 
     // Get service details
     const service = await db.query.services.findFirst({
@@ -31,35 +51,63 @@ export async function createEnhancedBookingAction({
       return { error: "Service not found" }
     }
 
-    // Check if user exists or create new one
+    if (!service.isActive) {
+      return { error: "This service is currently unavailable" }
+    }
+
+    // Look up user by the session user ID (which should be the database CUID2)
     let user = await db.query.users.findFirst({
-      where: eq(users.email, customerInfo.email),
+      where: eq(users.id, sessionUserId),
     })
 
     if (!user) {
-      // Create new user
-      const [newUser] = await db.insert(users).values({
-        name: customerInfo.name,
-        email: customerInfo.email,
-        phone: customerInfo.phone,
-      }).returning()
-      user = newUser
-    } else {
-      // Update existing user with new info if provided
-      await db.update(users)
+      // If user doesn't exist, this indicates a problem with authentication
+      // The user should already exist in the database when they're authenticated
+      console.error('User not found in database with ID:', sessionUserId)
+      return { error: "User session invalid. Please log out and log back in." }
+    }
+
+    // Update existing user with current booking info if provided
+    try {
+      const updatedUser = await db.update(users)
         .set({
-          name: customerInfo.name,
-          phone: customerInfo.phone,
+          name: customerInfo.name || user.name,
+          email: customerInfo.email || user.email,
+          phone: customerInfo.phone || user.phone,
+          updatedAt: new Date(),
         })
-        .where(eq(users.id, user.id))
+        .where(eq(users.id, sessionUserId))
+        .returning()
+
+      if (!updatedUser.length) {
+        return { error: "Failed to update user information" }
+      }
+
+      user = updatedUser[0]
+      console.log('Updated existing user:', user.id, user.email)
+    } catch (updateError) {
+      console.error('Failed to update user:', updateError)
+      return { error: "Failed to update user information" }
+    }
+
+    // Validate appointment time
+    const appointmentDate = new Date(appointmentTime.date)
+    const [hours, minutes] = appointmentTime.time.split(':').map(Number)
+    
+    if (isNaN(hours) || isNaN(minutes)) {
+      return { error: "Invalid appointment time format" }
+    }
+
+    appointmentDate.setHours(hours, minutes, 0, 0)
+    
+    // Check if appointment is in the past
+    const now = new Date()
+    if (appointmentDate <= now) {
+      return { error: "Cannot book appointments in the past" }
     }
 
     // Calculate end time
-    const startDate = new Date(appointmentTime.date)
-    const [hours, minutes] = appointmentTime.time.split(':').map(Number)
-    startDate.setHours(hours, minutes, 0, 0)
-    
-    const endDate = new Date(startDate)
+    const endDate = new Date(appointmentDate)
     endDate.setMinutes(endDate.getMinutes() + service.duration)
 
     const formatTime = (date: Date) => {
@@ -70,24 +118,42 @@ export async function createEnhancedBookingAction({
       })
     }
 
-    // Create booking
+    // Check for existing bookings at the same time (basic conflict check)
+    const existingBooking = await db.query.bookings.findFirst({
+      where: (bookings, { and, eq, gte, lt, ne }) => and(
+        eq(bookings.appointmentDate, appointmentDate),
+        eq(bookings.startTime, formatTime(appointmentDate)),
+        ne(bookings.status, 'cancelled')
+      )
+    })
+
+    if (existingBooking) {
+      return { error: "This time slot is already booked. Please choose another time." }
+    }
+
+    // Create booking with the database user CUID2
     const [booking] = await db.insert(bookings).values({
       serviceId: service.id,
-      customerId: user.id,
-      appointmentDate: startDate,
-      startTime: formatTime(startDate),
+      customerId: sessionUserId, // Now guaranteed to be the correct database CUID2
+      appointmentDate: appointmentDate,
+      startTime: formatTime(appointmentDate),
       endTime: formatTime(endDate),
       totalPrice: service.price,
       status: 'pending',
       notes: customerInfo.notes || null,
     }).returning()
 
-    console.log('Booking created successfully:', booking.id)
+    console.log('Booking created successfully with PENDING status:', {
+      bookingId: booking.id,
+      customerId: sessionUserId,
+      customerEmail: user.email,
+      status: booking.status
+    })
 
-    // Send email notifications immediately after booking creation
+    // Send email notifications
     try {
       // Format appointment date
-      const appointmentDate = new Date(startDate).toLocaleDateString('en-NG', {
+      const appointmentDateFormatted = appointmentDate.toLocaleDateString('en-NG', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
@@ -97,7 +163,7 @@ export async function createEnhancedBookingAction({
       // Send admin notification email
       const adminEmailResult = await resend.emails.send({
         from: 'Hair Cutz Studio <onboarding@resend.dev>',
-        to: 'codebyriven@gmail.com', // Your admin email
+        to: 'codebyriven@gmail.com',
         subject: `New Booking Created - #${booking.id}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
@@ -105,14 +171,14 @@ export async function createEnhancedBookingAction({
             <p style="font-size: 18px; text-align: center; margin-bottom: 30px;">Booking #${booking.id}</p>
             
             <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
-              <h2 style="color: #92400e; margin-top: 0;">Pending Appointment</h2>
+              <h2 style="color: #92400e; margin-top: 0;">Pending Appointment (Payment Required)</h2>
               <p><strong>Service:</strong> ${service.name}</p>
               <p><strong>Category:</strong> ${service.category || 'General'}</p>
-              <p><strong>Date:</strong> ${appointmentDate}</p>
+              <p><strong>Date:</strong> ${appointmentDateFormatted}</p>
               <p><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</p>
               <p><strong>Duration:</strong> ${service.duration} minutes</p>
               <p><strong>Price:</strong> ₦${parseFloat(booking.totalPrice).toLocaleString()}</p>
-              <p><strong>Status:</strong> Pending Payment</p>
+              <p><strong>Status:</strong> <span style="color: #d97706; font-weight: bold;">PENDING</span></p>
             </div>
 
             <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
@@ -120,13 +186,15 @@ export async function createEnhancedBookingAction({
               <p><strong>Name:</strong> ${user.name || 'N/A'}</p>
               <p><strong>Email:</strong> ${user.email}</p>
               <p><strong>Phone:</strong> ${user.phone || 'N/A'}</p>
+              <p><strong>Customer ID:</strong> ${sessionUserId}</p>
               ${booking.notes ? `<p><strong>Notes:</strong> ${booking.notes}</p>` : ''}
             </div>
 
-            <div style="background-color: #dbeafe; padding: 15px; border-radius: 8px;">
-              <h3 style="color: #1e40af; margin-top: 0;">Next Steps</h3>
-              <p style="color: #1e40af; margin: 0;">
-                Customer needs to complete payment. You'll receive another email once payment is confirmed!
+            <div style="background-color: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444;">
+              <h3 style="color: #dc2626; margin-top: 0;">⚠️ Action Required</h3>
+              <p style="color: #dc2626; margin: 0;">
+                This booking is <strong>PENDING</strong> until payment is confirmed. 
+                Remember to mark as "Confirmed" once payment is received.
               </p>
             </div>
           </div>
@@ -136,8 +204,8 @@ export async function createEnhancedBookingAction({
       // Send customer booking confirmation email
       const customerEmailResult = await resend.emails.send({
         from: 'Hair Cutz Studio <onboarding@resend.dev>',
-        to: 'codebyriven@gmail.com',
-        subject: `Booking Created - ${service.name} | Complete Payment`,
+        to: "codebyriven@gmail.com",
+        subject: `Booking Created - ${service.name} | Payment Required`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
             <div style="text-align: center; margin-bottom: 30px;">
@@ -149,29 +217,29 @@ export async function createEnhancedBookingAction({
               <h2 style="color: #92400e; margin-top: 0;">Your Appointment Details</h2>
               <p><strong>Service:</strong> ${service.name}</p>
               <p><strong>Description:</strong> ${service.description || 'Professional service'}</p>
-              <p><strong>Date:</strong> ${appointmentDate}</p>
+              <p><strong>Date:</strong> ${appointmentDateFormatted}</p>
               <p><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</p>
               <p><strong>Duration:</strong> ${service.duration} minutes</p>
               <p><strong>Total Amount:</strong> ₦${parseFloat(booking.totalPrice).toLocaleString()}</p>
               ${booking.notes ? `<p><strong>Your Notes:</strong> ${booking.notes}</p>` : ''}
             </div>
 
-            <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
               <h3 style="color: #dc2626; margin-top: 0;">⚠️ Payment Required</h3>
               <p style="color: #dc2626; margin: 0;">
-                Your appointment is reserved but <strong>not confirmed</strong> until payment is completed. 
+                Your appointment is reserved but <strong>NOT CONFIRMED</strong> until payment is completed. 
                 Please complete your payment to secure your slot!
               </p>
             </div>
 
             <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-              <h3 style="color: #0369a1; margin-top: 0;">What Happens Next?</h3>
-              <ul style="color: #1e40af; margin: 0; padding-left: 20px;">
-                <li>Complete your payment using the provided instructions</li>
+              <h3 style="color: #0369a1; margin-top: 0;">Next Steps</h3>
+              <ol style="color: #1e40af; margin: 0; padding-left: 20px;">
+                <li>Complete payment via our secure payment system</li>
                 <li>You'll receive a confirmation email once payment is processed</li>
-                <li>Your appointment will be officially confirmed</li>
+                <li>Your appointment will then be confirmed</li>
                 <li>We'll send you a reminder 24 hours before your appointment</li>
-              </ul>
+              </ol>
             </div>
 
             <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
@@ -188,29 +256,26 @@ export async function createEnhancedBookingAction({
 
       console.log("Booking creation emails sent successfully", { 
         bookingId: booking.id,
-        admin: adminEmailResult.data?.id, 
-        customer: customerEmailResult.data?.id,
-        adminSuccess: adminEmailResult.error ? false : true,
-        customerSuccess: customerEmailResult.error ? false : true
+        adminSuccess: !adminEmailResult.error,
+        customerSuccess: !customerEmailResult.error,
+        customerEmail: user.email,
+        customerId: sessionUserId
       })
-
-      // Log any email errors but don't fail the booking
-      if (adminEmailResult.error || customerEmailResult.error) {
-        console.error("Email errors during booking creation:", {
-          admin: adminEmailResult.error,
-          customer: customerEmailResult.error
-        })
-      }
 
     } catch (emailError) {
       console.error("Failed to send booking creation emails:", emailError)
       // Don't fail the booking creation if emails fail
     }
 
+    // Revalidate relevant pages
+    revalidatePath('/bookings')
+    revalidatePath('/admin/bookings')
+
     // Return success with booking ID and redirect URL
     return {
       success: true,
       bookingId: booking.id,
+      customerId: sessionUserId,
       redirectUrl: `/booking/success?id=${booking.id}`,
     }
 
@@ -220,169 +285,12 @@ export async function createEnhancedBookingAction({
   }
 }
 
-// Export the payment confirmation functions that the payment component needs
+// Payment confirmation function - ENSURES STATUS CHANGES TO CONFIRMED
 export async function confirmPaymentAndSendEmails(bookingId: string) {
   try {
-    // Get booking details with related data using your schema structure
-    const booking = await db.query.bookings.findFirst({
-      where: eq(bookings.id, bookingId),
-      with: {
-        service: true,    // This matches your servicesRelations
-        customer: true,   // This matches your usersRelations via customerId
-      }
-    })
-
-    if (!booking) {
-      return { error: "Booking not found" }
-    }
-
-    if (!booking.service) {
-      return { error: "Service details not found" }
-    }
-
-    if (!booking.customer) {
-      return { error: "Customer details not found" }
-    }
-
-    // Update booking status to confirmed
-    await db.update(bookings)
-      .set({ 
-        status: 'confirmed',
-        updatedAt: new Date()
-      })
-      .where(eq(bookings.id, bookingId))
-
-    // Format appointment date - handle the timestamp correctly
-    const appointmentDate = new Date(booking.appointmentDate).toLocaleDateString('en-NG', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-
-    // Send admin notification
-    const adminEmailResult = await resend.emails.send({
-      from: 'Hair Cutz Studio <onboarding@resend.dev>',
-      to: 'codebyriven@gmail.com', // Your admin email
-      subject: `Payment Received - Booking #${bookingId}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-          <h1 style="color: #059669; text-align: center;">Payment Confirmed!</h1>
-          <p style="font-size: 18px; text-align: center; margin-bottom: 30px;">Booking #${bookingId}</p>
-          
-          <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #10b981;">
-            <h2 style="color: #065f46; margin-top: 0;">Confirmed Appointment</h2>
-            <p><strong>Service:</strong> ${booking.service.name}</p>
-            <p><strong>Category:</strong> ${booking.service.category || 'General'}</p>
-            <p><strong>Date:</strong> ${appointmentDate}</p>
-            <p><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</p>
-            <p><strong>Duration:</strong> ${booking.service.duration} minutes</p>
-            <p><strong>Price:</strong> ₦${parseFloat(booking.totalPrice).toLocaleString()}</p>
-          </div>
-
-          <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-            <h2 style="color: #1f2937; margin-top: 0;">Customer Details</h2>
-            <p><strong>Name:</strong> ${booking.customer.name || 'N/A'}</p>
-            <p><strong>Email:</strong> ${booking.customer.email}</p>
-            <p><strong>Phone:</strong> ${booking.customer.phone || 'N/A'}</p>
-            ${booking.notes ? `<p><strong>Notes:</strong> ${booking.notes}</p>` : ''}
-          </div>
-
-          <div style="background-color: #dbeafe; padding: 15px; border-radius: 8px;">
-            <h3 style="color: #1e40af; margin-top: 0;">Action Required</h3>
-            <p style="color: #1e40af; margin: 0;">
-              Customer has confirmed payment. Please prepare for the appointment and update your calendar!
-            </p>
-          </div>
-        </div>
-      `,
-    })
-
-    // Send customer confirmation
-    const customerEmailResult = await resend.emails.send({
-      from: 'Hair Cutz Studio <onboarding@resend.dev>',
-      to: 'codebyriven@gmail.com',
-      subject: `Booking Confirmed - ${booking.service.name}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #059669;">Booking Confirmed!</h1>
-            <p style="font-size: 18px; color: #6b7280;">Reference: #${bookingId}</p>
-          </div>
-          
-          <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #10b981;">
-            <h2 style="color: #065f46; margin-top: 0;">Your Confirmed Appointment</h2>
-            <p><strong>Service:</strong> ${booking.service.name}</p>
-            <p><strong>Description:</strong> ${booking.service.description || 'Professional service'}</p>
-            <p><strong>Date:</strong> ${appointmentDate}</p>
-            <p><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</p>
-            <p><strong>Duration:</strong> ${booking.service.duration} minutes</p>
-            <p><strong>Total Paid:</strong> ₦${parseFloat(booking.totalPrice).toLocaleString()}</p>
-            ${booking.notes ? `<p><strong>Your Notes:</strong> ${booking.notes}</p>` : ''}
-          </div>
-
-          <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-            <h3 style="color: #0369a1; margin-top: 0;">What to Expect</h3>
-            <ul style="color: #1e40af; margin: 0; padding-left: 20px;">
-              <li>Please arrive 5-10 minutes early for your appointment</li>
-              <li>Bring a valid ID for verification</li>
-              <li>We'll send you a reminder 24 hours before your appointment</li>
-              <li>Contact us immediately if you need to reschedule</li>
-              <li>Our professional barber will provide excellent service</li>
-            </ul>
-          </div>
-
-          <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-            <h3 style="color: #92400e; margin-top: 0;">Cancellation Policy</h3>
-            <p style="color: #92400e; margin: 0; font-size: 14px;">
-              Please provide at least 24 hours notice for cancellations. Late cancellations may be subject to charges.
-            </p>
-          </div>
-
-          <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-            <p style="color: #6b7280; margin: 0;">
-              Questions? Contact us at <strong>+234 XXX XXX XXXX</strong>
-            </p>
-            <p style="color: #6b7280; margin: 5px 0 0 0; font-size: 14px;">
-              Hair Cutz Studio - Professional Barber Services
-            </p>
-          </div>
-        </div>
-      `,
-    })
-
-    console.log("Payment confirmation emails sent successfully", { 
-      bookingId,
-      admin: adminEmailResult.data?.id, 
-      customer: customerEmailResult.data?.id,
-      adminSuccess: adminEmailResult.error ? false : true,
-      customerSuccess: customerEmailResult.error ? false : true
-    })
-
-    // Check if either email failed
-    if (adminEmailResult.error || customerEmailResult.error) {
-      console.error("Email errors:", {
-        admin: adminEmailResult.error,
-        customer: customerEmailResult.error
-      })
-      return { 
-        success: true, 
-        warning: "Booking confirmed but some emails may have failed to send" 
-      }
-    }
-
-    return { success: true }
-
-  } catch (error) {
-    console.error("Error confirming payment:", error)
-    return { error: "Failed to confirm payment. Please contact support." }
-  }
-}
-
-// Alternative manual version if relations don't work
-export async function confirmPaymentManual(bookingId: string) {
-  try {
-    // First get the booking
+    console.log('Confirming payment for booking:', bookingId)
+    
+    // Use manual queries to avoid relation issues
     const bookingResult = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1)
     
     if (!bookingResult.length) {
@@ -390,6 +298,7 @@ export async function confirmPaymentManual(bookingId: string) {
     }
 
     const booking = bookingResult[0]
+    console.log('Found booking with status:', booking.status)
 
     // Get service details
     const serviceResult = await db.select().from(services).where(eq(services.id, booking.serviceId)).limit(1)
@@ -409,13 +318,22 @@ export async function confirmPaymentManual(bookingId: string) {
 
     const customer = customerResult[0]
 
-    // Update booking status
-    await db.update(bookings)
+    // Update booking status to CONFIRMED (from pending)
+    const [updatedBooking] = await db.update(bookings)
       .set({ 
         status: 'confirmed',
         updatedAt: new Date()
       })
       .where(eq(bookings.id, bookingId))
+      .returning()
+
+    console.log('Booking status updated:', {
+      bookingId,
+      oldStatus: booking.status,
+      newStatus: updatedBooking.status,
+      customerId: customer.id,
+      customerEmail: customer.email
+    })
 
     // Format appointment date
     const appointmentDate = new Date(booking.appointmentDate).toLocaleDateString('en-NG', {
@@ -425,89 +343,132 @@ export async function confirmPaymentManual(bookingId: string) {
       day: 'numeric'
     })
 
-    // Send admin email
+    // Send admin notification
     const adminEmailResult = await resend.emails.send({
       from: 'Hair Cutz Studio <onboarding@resend.dev>',
       to: 'codebyriven@gmail.com',
-      subject: `Payment Received - Booking #${bookingId}`,
+      subject: `Payment Confirmed - Booking #${bookingId}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h1 style="color: #059669; text-align: center;">Payment Confirmed!</h1>
-          <p style="font-size: 18px; text-align: center; margin-bottom: 30px;">Booking #${bookingId}</p>
+          <p style="font-size: 18px; text-align: center;">Booking #${bookingId}</p>
           
-          <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #10b981;">
+          <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #059669;">
             <h2 style="color: #065f46; margin-top: 0;">Confirmed Appointment</h2>
             <p><strong>Service:</strong> ${service.name}</p>
-            <p><strong>Category:</strong> ${service.category || 'General'}</p>
+            <p><strong>Customer:</strong> ${customer.name} (${customer.email})</p>
+            <p><strong>Customer ID:</strong> ${customer.id}</p>
             <p><strong>Date:</strong> ${appointmentDate}</p>
             <p><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</p>
-            <p><strong>Duration:</strong> ${service.duration} minutes</p>
             <p><strong>Price:</strong> ₦${parseFloat(booking.totalPrice).toLocaleString()}</p>
-          </div>
-
-          <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-            <h2 style="color: #1f2937; margin-top: 0;">Customer Details</h2>
-            <p><strong>Name:</strong> ${customer.name || 'N/A'}</p>
-            <p><strong>Email:</strong> ${customer.email}</p>
-            <p><strong>Phone:</strong> ${customer.phone || 'N/A'}</p>
-            ${booking.notes ? `<p><strong>Notes:</strong> ${booking.notes}</p>` : ''}
+            <p><strong>Status:</strong> <span style="color: #059669; font-weight: bold;">CONFIRMED</span></p>
           </div>
         </div>
       `,
     })
 
-    // Send customer email
+    // Send customer confirmation
     const customerEmailResult = await resend.emails.send({
       from: 'Hair Cutz Studio <onboarding@resend.dev>',
       to: 'codebyriven@gmail.com',
       subject: `Booking Confirmed - ${service.name}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #059669;">Booking Confirmed!</h1>
-            <p style="font-size: 18px; color: #6b7280;">Reference: #${bookingId}</p>
-          </div>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #059669; text-align: center;">Booking Confirmed!</h1>
+          <p style="font-size: 18px; text-align: center;">Reference: #${bookingId}</p>
           
-          <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #10b981;">
+          <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #059669;">
             <h2 style="color: #065f46; margin-top: 0;">Your Confirmed Appointment</h2>
             <p><strong>Service:</strong> ${service.name}</p>
-            <p><strong>Description:</strong> ${service.description || 'Professional service'}</p>
             <p><strong>Date:</strong> ${appointmentDate}</p>
             <p><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</p>
-            <p><strong>Duration:</strong> ${service.duration} minutes</p>
             <p><strong>Total Paid:</strong> ₦${parseFloat(booking.totalPrice).toLocaleString()}</p>
-            ${booking.notes ? `<p><strong>Your Notes:</strong> ${booking.notes}</p>` : ''}
+            <p><strong>Status:</strong> <span style="color: #059669; font-weight: bold;">CONFIRMED</span></p>
           </div>
 
-          <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px;">
             <h3 style="color: #0369a1; margin-top: 0;">What to Expect</h3>
-            <ul style="color: #1e40af; margin: 0; padding-left: 20px;">
+            <ul style="color: #1e40af;">
               <li>Please arrive 5-10 minutes early</li>
               <li>Bring a valid ID for verification</li>
               <li>We'll send you a reminder 24 hours before</li>
-              <li>Contact us if you need to reschedule</li>
+              <li>Your appointment is now secured!</li>
             </ul>
-          </div>
-
-          <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-            <p style="color: #6b7280; margin: 0;">
-              Questions? Contact us at <strong>+234 XXX XXX XXXX</strong>
-            </p>
           </div>
         </div>
       `,
     })
 
-    console.log("Manual payment confirmation emails sent", { 
+    console.log("Payment confirmation emails sent", { 
       bookingId,
-      admin: adminEmailResult.data?.id, 
-      customer: customerEmailResult.data?.id 
+      adminSuccess: !adminEmailResult.error,
+      customerSuccess: !customerEmailResult.error,
+      customerEmail: customer.email,
+      customerId: customer.id
     })
 
-    return { success: true }
+    // Revalidate relevant pages
+    revalidatePath('/bookings')
+    revalidatePath('/admin/bookings')
+
+    return { success: true, status: 'confirmed' }
+
+  } catch (error) {
+    console.error("Error confirming payment:", error)
+    return { error: "Failed to confirm payment. Please contact support." }
+  }
+}
+
+// Manual payment confirmation function as fallback
+export async function confirmPaymentManual(bookingId: string) {
+  try {
+    console.log("Using manual payment confirmation approach for booking:", bookingId)
+    
+    // Update booking status directly to CONFIRMED
+    const updateResult = await db.update(bookings)
+      .set({ 
+        status: 'confirmed',
+        updatedAt: new Date()
+      })
+      .where(eq(bookings.id, bookingId))
+      .returning()
+
+    if (!updateResult.length) {
+      return { error: "Failed to update booking status" }
+    }
+
+    console.log("Booking status manually updated to CONFIRMED:", {
+      bookingId,
+      newStatus: updateResult[0].status
+    })
+
+    // For manual approach, send a basic notification
+    try {
+      await resend.emails.send({
+        from: 'Hair Cutz Studio <onboarding@resend.dev>',
+        to: 'codebyriven@gmail.com',
+        subject: `Manual Payment Confirmation - Booking #${bookingId}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h1 style="color: #059669;">Manual Payment Confirmed</h1>
+            <p>Booking #${bookingId} has been manually confirmed.</p>
+            <p><strong>Status:</strong> <span style="color: #059669;">CONFIRMED</span></p>
+            <p>Please check the admin dashboard for full details.</p>
+          </div>
+        `,
+      })
+    } catch (emailError) {
+      console.warn("Manual confirmation email failed:", emailError)
+    }
+
+    // Revalidate relevant pages
+    revalidatePath('/bookings')
+    revalidatePath('/bookings')
+
+    return { success: true, status: 'confirmed' }
 
   } catch (error) {
     console.error("Manual payment confirmation error:", error)
-    return { error: "Failed to confirm payment" }
+    return { error: "Failed to manually confirm payment" }
   }
 }

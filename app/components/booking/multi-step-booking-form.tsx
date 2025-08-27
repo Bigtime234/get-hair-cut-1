@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useSession } from "next-auth/react"
 import CustomerInfoStep from "./customer-info-step"
 import AppointmentTimeStep from "./appointment-time-step"
 import ReviewStep from "./review-step"
@@ -11,7 +12,7 @@ import { createEnhancedBookingAction } from "@/lib/actions/enhanced-create-booki
 import { CustomerInfo, AppointmentTime } from "@/Types/booking-schema"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, CreditCard, CheckCircle, User } from "lucide-react"
+import { Calendar, CreditCard, CheckCircle, User, AlertCircle } from "lucide-react"
 
 type BookingStep = 'customer-info' | 'appointment-time' | 'review' | 'payment'
 
@@ -31,6 +32,7 @@ type MultiStepBookingFormProps = {
 
 export default function MultiStepBookingForm({ service }: MultiStepBookingFormProps) {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [currentStep, setCurrentStep] = useState<BookingStep>('customer-info')
   const [isLoading, setIsLoading] = useState(false)
   const [bookingId, setBookingId] = useState<string>("")
@@ -47,6 +49,18 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
     date: new Date(),
     time: "",
   })
+
+  // Pre-fill form with user session data when available
+  useEffect(() => {
+    if (session?.user) {
+      setCustomerInfo(prev => ({
+        ...prev,
+        name: session.user.name || prev.name,
+        email: session.user.email || prev.email,
+        // Don't override phone if user already filled it
+      }))
+    }
+  }, [session])
 
   // Format price for display
   const formatPrice = (price: string) => {
@@ -69,6 +83,18 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
   }
 
   const handleReviewNext = async () => {
+    // Check if user is authenticated
+    if (status === 'loading') {
+      toast.error("Please wait while we verify your session...")
+      return
+    }
+
+    if (!session?.user?.id) {
+      toast.error("You must be logged in to make a booking. Please log in and try again.")
+      router.push('/login')
+      return
+    }
+
     setIsLoading(true)
     
     try {
@@ -76,12 +102,14 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
         serviceId: service.id,
         customerInfo,
         appointmentTime,
+        sessionUserId: session.user.id // This should be the database CUID2
       })
 
       const result = await createEnhancedBookingAction({
         serviceId: service.id,
         customerInfo,
         appointmentTime,
+        sessionUserId: session.user.id // Pass the authenticated user's database ID
       })
 
       if (result.error) {
@@ -140,6 +168,87 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
 
   const currentStepIndex = steps.findIndex(step => step.id === currentStep)
 
+  // Show loading state while checking authentication
+  if (status === 'loading') {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
+          <CardHeader>
+            <div className="animate-pulse">
+              <div className="h-8 bg-amber-200 rounded w-64 mb-2"></div>
+              <div className="h-4 bg-amber-100 rounded w-96"></div>
+            </div>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600 mx-auto"></div>
+              <p className="mt-2 text-slate-600">Loading your session...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show authentication required message
+  if (!session) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
+          <CardHeader>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="space-y-2">
+                <CardTitle className="text-2xl text-slate-800">{service.name}</CardTitle>
+                {service.description && (
+                  <p className="text-slate-600">{service.description}</p>
+                )}
+                {service.category && (
+                  <Badge variant="secondary" className="w-fit">
+                    {service.category.charAt(0).toUpperCase() + service.category.slice(1)}
+                  </Badge>
+                )}
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-amber-700">{formatPrice(service.price)}</div>
+                <div className="text-sm text-slate-600">{service.duration} minutes</div>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-blue-800 flex items-center gap-2">
+              <AlertCircle className="h-6 w-6" />
+              Login Required
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-blue-700 mb-6">
+              You need to be logged in to make a booking. Please log in to continue.
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => router.push('/login')}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+              >
+                Login to Continue
+              </button>
+              <button 
+                onClick={() => router.push('/services')}
+                className="bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors font-semibold"
+              >
+                Back to Services
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Service Header */}
@@ -163,6 +272,18 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
             </div>
           </div>
         </CardHeader>
+      </Card>
+
+      {/* User Info Display */}
+      <Card className="bg-green-50 border-green-200">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <span className="text-green-800 font-medium">
+              Logged in as: {session.user.name || session.user.email}
+            </span>
+          </div>
+        </CardContent>
       </Card>
 
       {/* Step Indicator */}

@@ -1,6 +1,6 @@
 import { db } from "@/server"
 import { auth } from "@/server/auth"
-import { bookings } from "@/server/schema"
+import { bookings, users } from "@/server/schema"
 import { eq } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import {
@@ -41,7 +41,7 @@ import {
   MoreHorizontal, CalendarClock, Scissors, Clock,
   Star, AlertTriangle
 } from "lucide-react"
-import { updateBookingStatus } from "@/lib/actions/update-booking-status"
+import { updateBookStatus } from "@/lib/actions/update-book-status"
 
 // Helper function to format timestamp
 function formatBookingDate(dateString: string) {
@@ -109,19 +109,43 @@ type BookingType = {
 
 export default async function BookingsPage() {
   const session = await auth()
-  if (!session) redirect("/login")
+  if (!session?.user?.id) {
+    redirect("/login")
+  }
 
   const isAdmin = session.user.role === "admin"
   
-  const bookingsList = await db.query.bookings.findMany({
-    where: isAdmin ? undefined : eq(bookings.customerId, session.user.id),
-    with: {
-      customer: true,
-      service: true,
-      rating: true,
-    },
-    orderBy: (bookings, { desc }) => [desc(bookings.createdAt)]
-  }) as BookingType[]
+  let bookingsList: BookingType[] = []
+
+  try {
+    if (isAdmin) {
+      // Admin gets all bookings
+      bookingsList = await db.query.bookings.findMany({
+        with: {
+          customer: true,
+          service: true,
+          rating: true,
+        },
+        orderBy: (bookings, { desc }) => [desc(bookings.createdAt)]
+      }) as BookingType[]
+    } else {
+      // Regular users get their own bookings using the authenticated user's ID
+      bookingsList = await db.query.bookings.findMany({
+        where: eq(bookings.customerId, session.user.id), // This will now match the ID used during booking creation
+        with: {
+          customer: true,
+          service: true,
+          rating: true,
+        },
+        orderBy: (bookings, { desc }) => [desc(bookings.createdAt)]
+      }) as BookingType[]
+
+      console.log(`User ${session.user.email} (ID: ${session.user.id}) has ${bookingsList.length} bookings`)
+    }
+  } catch (error) {
+    console.error("Error fetching bookings:", error)
+    bookingsList = []
+  }
 
   return (
     <div className="container mx-auto py-8">
@@ -131,21 +155,26 @@ export default async function BookingsPage() {
             {isAdmin ? (
               <>
                 <Shield className="w-6 h-6 text-blue-600" />
-                Booking Management
+                All Customer Bookings
               </>
             ) : (
               <>
                 <Calendar className="w-6 h-6 text-indigo-600" />
-                My Appointments
+                My Orders
               </>
             )}
           </CardTitle>
           <CardDescription>
             {isAdmin 
-              ? "View and manage all customer bookings" 
-              : "Track your appointments and booking history"
+              ? `Managing ${bookingsList.length} customer bookings` 
+              : `You have ${bookingsList.length} orders`
             }
           </CardDescription>
+          {!isAdmin && (
+            <div className="text-sm text-muted-foreground">
+              Logged in as: {session.user.name || session.user.email} (ID: {session.user.id})
+            </div>
+          )}
         </CardHeader>
 
         <CardContent className="px-0">
@@ -153,14 +182,22 @@ export default async function BookingsPage() {
             <div className="py-12 text-center">
               <Calendar className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-4 text-lg font-medium">
-                No bookings found
+                No {isAdmin ? 'bookings' : 'orders'} found
               </h3>
               <p className="text-gray-500 mt-2">
                 {isAdmin 
                   ? "No customer bookings have been made yet." 
-                  : "You haven't made any bookings yet."
+                  : "You haven't made any orders yet. Why not book your first appointment?"
                 }
               </p>
+              {!isAdmin && (
+                <Button 
+                  className="mt-4"
+                  onClick={() => window.location.href = '/services'}
+                >
+                  Browse Services
+                </Button>
+              )}
             </div>
           ) : (
             <div className="overflow-hidden rounded-lg border">
@@ -168,7 +205,7 @@ export default async function BookingsPage() {
                 <TableHeader className="bg-gray-50">
                   <TableRow>
                     <TableHead className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Booking #
+                      Order #
                     </TableHead>
                     {isAdmin && (
                       <TableHead className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -204,6 +241,7 @@ export default async function BookingsPage() {
                           <div className="flex flex-col">
                             <span className="font-medium">{booking.customer.name || "N/A"}</span>
                             <span className="text-sm text-gray-500">{booking.customer.email || "N/A"}</span>
+                            <span className="text-xs text-gray-400">{booking.customer.id}</span>
                           </div>
                         </TableCell>
                       )}
@@ -241,17 +279,17 @@ export default async function BookingsPage() {
                         <div className="flex items-center gap-2">
                           <Badge
                             className={cn(
-                              "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                              "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
                               {
-                                "bg-yellow-100 text-yellow-800": booking.status === "pending",
-                                "bg-blue-100 text-blue-800": booking.status === "success",
-                                "bg-green-100 text-green-800": booking.status === "completed",
-                                "bg-red-100 text-red-800": booking.status === "cancelled",
-                                "bg-gray-100 text-gray-800": booking.status === "no_show",
+                                "bg-amber-100 text-amber-800 border-amber-200": booking.status === "pending",
+                                "bg-blue-100 text-blue-800 border-blue-200": booking.status === "confirmed",
+                                "bg-green-100 text-green-800 border-green-200": booking.status === "completed",
+                                "bg-gray-100 text-gray-800 border-gray-200": booking.status === "cancelled",
+                                "bg-red-100 text-red-800 border-red-200": booking.status === "no_show",
                               }
                             )}
                           >
-                            {booking.status.replace('_', ' ')}
+                            {booking.status === "no_show" ? "No Show" : booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                           </Badge>
                           {booking.rating && (
                             <div className="flex items-center gap-1">
@@ -276,52 +314,56 @@ export default async function BookingsPage() {
                                   View details
                                 </DropdownMenuItem>
                               </DialogTrigger>
-                              {isAdmin && booking.status === "pending" && (
+                              {isAdmin && (
                                 <>
-                                  <DropdownMenuItem>
-                                    <form action={async () => {
-                                      "use server"
-                                      await updateBookingStatus(booking.id, "confirmed")
-                                    }}>
-                                      <button type="submit" className="w-full text-left">
-                                        Confirm booking
-                                      </button>
-                                    </form>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <form action={async () => {
-                                      "use server"
-                                      await updateBookingStatus(booking.id, "cancelled", "Admin cancellation")
-                                    }}>
-                                      <button type="submit" className="w-full text-left">
-                                        Cancel booking
-                                      </button>
-                                    </form>
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              {isAdmin && booking.status === "confirmed" && (
-                                <>
-                                  <DropdownMenuItem>
-                                    <form action={async () => {
-                                      "use server"
-                                      await updateBookingStatus(booking.id, "completed")
-                                    }}>
-                                      <button type="submit" className="w-full text-left">
-                                        Mark completed
-                                      </button>
-                                    </form>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <form action={async () => {
-                                      "use server"
-                                      await updateBookingStatus(booking.id, "no_show", "Customer did not show up")
-                                    }}>
-                                      <button type="submit" className="w-full text-left">
-                                        Mark no-show
-                                      </button>
-                                    </form>
-                                  </DropdownMenuItem>
+                                  {booking.status === "pending" && (
+                                    <>
+                                      <DropdownMenuItem>
+                                        <form action={async () => {
+                                          "use server"
+                                          await updateBookStatus(booking.id, "confirmed")
+                                        }}>
+                                          <button type="submit" className="w-full text-left">
+                                            Confirm booking
+                                          </button>
+                                        </form>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem>
+                                        <form action={async () => {
+                                          "use server"
+                                          await updateBookStatus(booking.id, "cancelled", "Admin cancellation")
+                                        }}>
+                                          <button type="submit" className="w-full text-left">
+                                            Cancel booking
+                                          </button>
+                                        </form>
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                  {booking.status === "confirmed" && (
+                                    <>
+                                      <DropdownMenuItem>
+                                        <form action={async () => {
+                                          "use server"
+                                          await updateBookStatus(booking.id, "completed")
+                                        }}>
+                                          <button type="submit" className="w-full text-left">
+                                            Mark completed
+                                          </button>
+                                        </form>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem>
+                                        <form action={async () => {
+                                          "use server"
+                                          await updateBookStatus(booking.id, "no_show", "Customer did not show up")
+                                        }}>
+                                          <button type="submit" className="w-full text-left">
+                                            Mark no-show
+                                          </button>
+                                        </form>
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
                                 </>
                               )}
                             </DropdownMenuContent>
@@ -331,7 +373,7 @@ export default async function BookingsPage() {
                           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                             <DialogHeader>
                               <DialogTitle className="flex items-center gap-2">
-                                Booking #{booking.id.slice(-8)}
+                                Order #{booking.id.slice(-8)}
                                 {isAdmin && <Badge variant="secondary">Admin View</Badge>}
                                 {booking.rating && (
                                   <div className="flex items-center gap-1 ml-auto">
@@ -341,33 +383,36 @@ export default async function BookingsPage() {
                                 )}
                               </DialogTitle>
                               <DialogDescription>
-                                Appointment details and information
+                                Order details and appointment information
                               </DialogDescription>
                               <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                                 <CalendarClock className="h-4 w-4" />
                                 <span>
-                                  Booked on {booking.createdAt ? formatBookingDate(booking.createdAt.toISOString()) : "N/A"}
+                                  Ordered on {booking.createdAt ? formatBookingDate(booking.createdAt.toISOString()) : "N/A"}
                                 </span>
                               </div>
                             </DialogHeader>
 
                             <div className="mt-6 space-y-6">
-                              {/* Status Card */}
+                              {/* Status Card with Admin Actions */}
                               <Card>
                                 <CardHeader className="pb-2">
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                      <h3 className="text-lg font-medium">Booking Status</h3>
+                                      <h3 className="text-lg font-medium">Order Status</h3>
                                       <Badge
-                                        className={cn({
-                                          "bg-yellow-100 text-yellow-800": booking.status === "pending",
-                                          "bg-blue-100 text-blue-800": booking.status === "success",
-                                          "bg-green-100 text-green-800": booking.status === "completed",
-                                          "bg-red-100 text-red-800": booking.status === "cancelled",
-                                          "bg-gray-100 text-gray-800": booking.status === "no_show",
-                                        })}
+                                        className={cn(
+                                          "border",
+                                          {
+                                            "bg-amber-100 text-amber-800 border-amber-200": booking.status === "pending",
+                                            "bg-blue-100 text-blue-800 border-blue-200": booking.status === "confirmed",
+                                            "bg-green-100 text-green-800 border-green-200": booking.status === "completed",
+                                            "bg-gray-100 text-gray-800 border-gray-200": booking.status === "cancelled",
+                                            "bg-red-100 text-red-800 border-red-200": booking.status === "no_show",
+                                          }
+                                        )}
                                       >
-                                        {booking.status.replace('_', ' ')}
+                                        {booking.status === "no_show" ? "No Show" : booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                                       </Badge>
                                     </div>
                                     {isAdmin && (booking.status === "pending" || booking.status === "confirmed") && (
@@ -376,7 +421,7 @@ export default async function BookingsPage() {
                                           <>
                                             <form action={async () => {
                                               "use server"
-                                              await updateBookingStatus(booking.id, "confirmed")
+                                              await updateBookStatus(booking.id, "confirmed")
                                             }}>
                                               <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
                                                 <CheckCircle className="mr-2 h-4 w-4" />
@@ -385,7 +430,7 @@ export default async function BookingsPage() {
                                             </form>
                                             <form action={async () => {
                                               "use server"
-                                              await updateBookingStatus(booking.id, "cancelled", "Admin cancellation")
+                                              await updateBookStatus(booking.id, "cancelled", "Admin cancellation")
                                             }}>
                                               <Button size="sm" variant="destructive">
                                                 <X className="mr-2 h-4 w-4" />
@@ -398,7 +443,7 @@ export default async function BookingsPage() {
                                           <>
                                             <form action={async () => {
                                               "use server"
-                                              await updateBookingStatus(booking.id, "completed")
+                                              await updateBookStatus(booking.id, "completed")
                                             }}>
                                               <Button size="sm" className="bg-green-600 hover:bg-green-700">
                                                 <CheckCircle className="mr-2 h-4 w-4" />
@@ -407,7 +452,7 @@ export default async function BookingsPage() {
                                             </form>
                                             <form action={async () => {
                                               "use server"
-                                              await updateBookingStatus(booking.id, "no_show", "Customer did not show up")
+                                              await updateBookStatus(booking.id, "no_show", "Customer did not show up")
                                             }}>
                                               <Button size="sm" variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50">
                                                 <AlertTriangle className="mr-2 h-4 w-4" />

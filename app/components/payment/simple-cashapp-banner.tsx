@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Copy, Check, Scissors, Phone, Mail } from "lucide-react"
-import { confirmPaymentAndSendEmails, confirmPaymentManual } from "@/lib/actions/enhanced-create-booking"
+import { confirmPaymentAndSendEmails } from "@/lib/actions/enhanced-create-booking"
 import { toast } from "sonner" 
 
 type SimpleCashappBannerProps = {
@@ -42,14 +42,8 @@ export default function SimpleCashappBanner({
       // Show processing toast
       toast.info("Your booking is being processed...")
       
-      // First try the relations-based version
-      let result = await confirmPaymentAndSendEmails(bookingId)
-      
-      // If relations don't work, try manual version
-      if (result.error && result.error.includes("relation")) {
-        console.log("Relations failed, trying manual approach...")
-        result = await confirmPaymentManual(bookingId)
-      }
+      // Try to confirm payment and send emails
+      const result = await confirmPaymentAndSendEmails(bookingId)
       
       if (result.error) {
         console.error("Payment confirmation error:", result.error)
@@ -57,13 +51,8 @@ export default function SimpleCashappBanner({
         return
       }
 
-      if (result.warning) {
-        console.warn("Payment confirmation warning:", result.warning)
-        toast.warning(`Payment confirmed with warning: ${result.warning}`)
-      } else {
-        console.log("Payment confirmed and emails sent successfully!")
-        toast.success("Payment confirmed! You should receive a confirmation email shortly.")
-      }
+      console.log("Payment confirmed and emails sent successfully!")
+      toast.success("Payment confirmed! You should receive a confirmation email shortly.")
       
       // Call the original callback if provided
       if (onCompleteBookingAction) {

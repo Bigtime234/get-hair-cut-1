@@ -1,153 +1,249 @@
+// File: ./lib/actions/create-booking.ts
 "use server"
 
 import { db } from "@/server"
-import { auth } from "@/server/auth"
-import { bookings, users, services } from "@/server/schema"
-import { eq } from "drizzle-orm"
-import { revalidatePath } from "next/cache"
+import { users, bookings, services } from "@/server/schema"
+import { eq, and } from "drizzle-orm"
+import { createId } from '@paralleldrive/cuid2'
 import { Resend } from "resend"
+import { auth } from "@/server/auth"
+import { revalidatePath } from "next/cache"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-export async function updateBookingStatus(
-  bookingId: string, 
-  newStatus: "pending" | "confirmed" | "completed" | "cancelled" | "no_show",
-  cancelReason?: string
-) {
-  const user = await auth()
-  if (!user) {
-    throw new Error("Unauthorized")
-  }
+export type BookingData = {
+  customerName: string
+  customerEmail: string
+  customerPhone: string
+  serviceId: string
+  appointmentDate: Date
+  startTime: string
+  endTime: string
+  totalPrice: number
+  notes?: string
+}
 
-  // Check if user is admin or the booking owner
-  const isAdmin = user.user.role === "admin"
-  
-  if (!isAdmin) {
-    // If not admin, check if the booking belongs to the user
-    const booking = await db.query.bookings.findFirst({
-      where: eq(bookings.id, bookingId),
-    })
-    
-    if (!booking || booking.customerId !== user.user.id) {
-      throw new Error("Unauthorized to update this booking")
-    }
-  }
-
+/**
+ * Create a booking and send notifications.
+ * If the request is authenticated, use the logged in user's id as the customerId.
+ * If not authenticated, find-or-create a user based on email and use that id.
+ */
+export async function createBookingWithNotification(data: BookingData): Promise<
+  { success: { bookingId: string; customerId: string } } | { error: string }
+> {
   try {
-    // Get booking details for email notification
-    const booking = await db.query.bookings.findFirst({
-      where: eq(bookings.id, bookingId),
-      with: {
-        customer: true,
-        service: true,
-      },
+    // Basic validation
+    if (!data.customerName || !data.customerEmail || !data.customerPhone) {
+      return { error: "All customer information is required" }
+    }
+    if (!data.serviceId || !data.appointmentDate || !data.startTime || !data.endTime) {
+      return { error: "Service and appointment details are required" }
+    }
+
+    // Check service exists and is active
+    const service = await db.query.services.findFirst({
+      where: eq(services.id, data.serviceId),
     })
 
-    if (!booking) {
-      throw new Error("Booking not found")
+    if (!service) return { error: "Service not found" }
+    if (!service.isActive) return { error: "Service is not available for booking" }
+
+    // Check slot availability (same service, same appointmentDate and startTime)
+    const existingBooking = await db.query.bookings.findFirst({
+      where: and(
+        eq(bookings.serviceId, data.serviceId),
+        eq(bookings.appointmentDate, data.appointmentDate),
+        eq(bookings.startTime, data.startTime)
+      ),
+    })
+
+    if (existingBooking) {
+      return { error: "Time slot is no longer available" }
     }
 
-    // Update booking status
-    const updateData: any = {
-      status: newStatus,
+    // Use auth if available so that logged-in users see their bookings
+    const session = await auth()
+    let customerId: string
+
+    if (session) {
+      // Use the logged in user's id
+      customerId = session.user.id
+      // Optionally update profile info (name/phone) if different
+      const currentUser = await db.query.users.findFirst({ where: eq(users.id, customerId) })
+      if (currentUser && (currentUser.name !== data.customerName || currentUser.phone !== data.customerPhone)) {
+        await db.update(users)
+          .set({ name: data.customerName, phone: data.customerPhone, updatedAt: new Date() })
+          .where(eq(users.id, customerId))
+      }
+    } else {
+      // Not authenticated: find or create user by email
+      let customer = await db.query.users.findFirst({
+        where: eq(users.email, data.customerEmail),
+      })
+
+      if (!customer) {
+        const newCustomerId = createId()
+        const [newCustomer] = await db.insert(users).values({
+          id: newCustomerId,
+          name: data.customerName,
+          email: data.customerEmail,
+          phone: data.customerPhone,
+          role: 'user',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }).returning()
+
+        if (!newCustomer) return { error: "Failed to create customer record" }
+        customerId = newCustomer.id
+      } else {
+        customerId = customer.id
+        if (customer.name !== data.customerName || customer.phone !== data.customerPhone) {
+          await db.update(users)
+            .set({ name: data.customerName, phone: data.customerPhone, updatedAt: new Date() })
+            .where(eq(users.id, customerId))
+        }
+      }
+    }
+
+    // Create booking record with default status 'pending'
+    const bookingId = createId()
+    const [newBooking] = await db.insert(bookings).values({
+      id: bookingId,
+      customerId,
+      serviceId: data.serviceId,
+      appointmentDate: data.appointmentDate,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      status: 'pending',
+      totalPrice: data.totalPrice.toString(),
+      notes: data.notes || null,
+      createdAt: new Date(),
       updatedAt: new Date(),
-    }
+    }).returning()
 
-    if (cancelReason && (newStatus === "cancelled" || newStatus === "no_show")) {
-      updateData.cancelReason = cancelReason
-    }
+    if (!newBooking) return { error: "Failed to create booking" }
 
-    await db
-      .update(bookings)
-      .set(updateData)
-      .where(eq(bookings.id, bookingId))
-
-    // Send email notification if status changed to confirmed or cancelled
-    if (newStatus === "confirmed" || newStatus === "cancelled") {
-      const statusText = newStatus === "confirmed" ? "Confirmed" : "Cancelled"
-      const statusColor = newStatus === "confirmed" ? "#16a34a" : "#dc2626"
-      
-      const appointmentDate = booking.appointmentDate.toLocaleDateString('en-NG', {
+    // Send notifications (don't fail booking creation if emails fail)
+    try {
+      const appointmentDate = data.appointmentDate.toLocaleDateString('en-NG', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       })
 
-      const emailSubject = newStatus === "confirmed" 
-        ? `✅ Booking Confirmed - ${booking.service.name}`
-        : `❌ Booking Cancelled - ${booking.service.name}`
-
-      const { data, error } = await resend.emails.send({
-        from: 'Clean Cutz <onboarding@resend.dev>',
-        to: booking.customer.email || '',
-        subject: emailSubject,
+      // Admin email (replace admin email as needed)
+      await resend.emails.send({
+        from: 'Booking System <noreply@yourbarber.com>',
+        to: 'admin@yourbarber.com',
+        subject: `📅 New Booking Request - ${service.name}`,
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: ${statusColor}; margin-bottom: 10px;">Booking ${statusText}</h1>
-              <p style="font-size: 18px; color: #6b7280;">Booking Reference: #${booking.id}</p>
-            </div>
-            
-            <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-              <h2 style="color: #374151; margin-top: 0;">Appointment Details</h2>
-              <div style="space-y: 8px;">
-                <p><strong>Service:</strong> ${booking.service.name}</p>
-                <p><strong>Date:</strong> ${appointmentDate}</p>
-                <p><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</p>
-                <p><strong>Duration:</strong> ${booking.service.duration} minutes</p>
-                <p><strong>Price:</strong> ₦${parseFloat(booking.totalPrice).toLocaleString()}</p>
-                ${newStatus === "cancelled" && cancelReason ? `<p><strong>Cancellation Reason:</strong> ${cancelReason}</p>` : ''}
-              </div>
-            </div>
-
-            <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-              <h3 style="color: #374151; margin-top: 0;">Customer Information</h3>
-              <p><strong>Name:</strong> ${booking.customer.name || 'N/A'}</p>
-              <p><strong>Email:</strong> ${booking.customer.email || 'N/A'}</p>
-              <p><strong>Phone:</strong> ${booking.customer.phone || 'N/A'}</p>
-              ${booking.notes ? `<p><strong>Notes:</strong> ${booking.notes}</p>` : ''}
-            </div>
-
-            ${newStatus === "confirmed" ? `
-              <div style="background-color: #dcfce7; padding: 15px; border-radius: 8px; border-left: 4px solid #16a34a;">
-                <h3 style="color: #15803d; margin-top: 0;">What's Next?</h3>
-                <ul style="color: #166534; margin: 0; padding-left: 20px;">
-                  <li>Your appointment is confirmed and reserved</li>
-                  <li>Please arrive 5-10 minutes early</li>
-                  <li>Bring a valid ID for verification</li>
-                  <li>We'll send you a reminder 24 hours before your appointment</li>
-                </ul>
-              </div>
-            ` : `
-              <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; border-left: 4px solid #dc2626;">
-                <h3 style="color: #dc2626; margin-top: 0;">Booking Cancelled</h3>
-                <p style="color: #991b1b; margin: 0;">
-                  We're sorry your appointment has been cancelled. If you'd like to reschedule, please visit our website or call us directly.
-                </p>
-              </div>
-            `}
-
-            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-              <p style="color: #6b7280; margin: 0;">
-                Need help? Contact us at <strong>+234 XXX XXX XXXX</strong>
-              </p>
-            </div>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2>New Booking: #${newBooking.id}</h2>
+            <p><strong>Service:</strong> ${service.name}</p>
+            <p><strong>Date:</strong> ${appointmentDate}</p>
+            <p><strong>Time:</strong> ${data.startTime} - ${data.endTime}</p>
+            <p><strong>Customer:</strong> ${data.customerName} (${data.customerEmail})</p>
           </div>
         `,
       })
 
-      if (error) {
-        console.error("Email notification failed:", error)
-        // Don't fail the status update if email fails
-      }
+      // Customer email
+      await resend.emails.send({
+        from: 'Your Barber <noreply@yourbarber.com>',
+        to: data.customerEmail,
+        subject: `📋 Booking Request Submitted - ${service.name}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2>Thanks — booking ref #${newBooking.id}</h2>
+            <p>Service: ${service.name}</p>
+            <p>Date: ${appointmentDate}</p>
+            <p>Time: ${data.startTime} - ${data.endTime}</p>
+          </div>
+        `,
+      })
+    } catch (emailError) {
+      console.error("Booking emails failed:", emailError)
+      // proceed — booking is created
     }
 
-    revalidatePath("/bookings")
-    return { success: true, message: `Booking ${newStatus} successfully` }
-    
+    // Revalidate bookings list page (so user/admin sees fresh data)
+    try {
+      revalidatePath("/bookings")
+      revalidatePath("/admin/bookings")
+    } catch (e) {
+      // Not fatal; dev only
+    }
+
+    return { success: { bookingId: newBooking.id, customerId } }
   } catch (error) {
-    console.error("Error updating booking status:", error)
-    throw new Error("Failed to update booking status")
+    console.error("Error creating booking:", error)
+    return { error: "Failed to create booking. Please try again." }
+  }
+}
+
+/**
+ * Helper: calculate end time string "HH:MM" given start "HH:MM" and duration in minutes.
+ */
+export async function calculateEndTime(startTime: string, durationMinutes: number): Promise<string> {
+  const [hours, minutes] = startTime.split(':').map(Number)
+  const startMinutes = hours * 60 + minutes
+  const endMinutes = startMinutes + durationMinutes
+
+  const endHours = Math.floor(endMinutes / 60)
+  const endMins = endMinutes % 60
+
+  return `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`
+}
+
+/**
+ * Adapter used by your booking form layer.
+ * Accepts form-shaped data and calls createBookingWithNotification.
+ */
+type CustomerInfo = { name: string; email: string; phone: string; notes?: string }
+type AppointmentTime = { date: Date; time: string }
+
+export async function createEnhancedBookingAction(data: {
+  serviceId: string
+  customerInfo: CustomerInfo
+  appointmentTime: AppointmentTime
+}) {
+  try {
+    // Fetch service
+    const service = await db.query.services.findFirst({ where: eq(services.id, data.serviceId) })
+    if (!service) return { error: "Service not found" }
+
+    // Construct appointment date time
+    const appointmentDateTime = new Date(data.appointmentTime.date)
+    const [hours, minutes] = data.appointmentTime.time.split(':').map(Number)
+    appointmentDateTime.setHours(hours, minutes, 0, 0)
+
+    // Calculate end time
+    const endTime = await calculateEndTime(data.appointmentTime.time, service.duration)
+
+    // Build booking payload
+    const bookingData: BookingData = {
+      customerName: data.customerInfo.name,
+      customerEmail: data.customerInfo.email,
+      customerPhone: data.customerInfo.phone,
+      serviceId: data.serviceId,
+      appointmentDate: appointmentDateTime,
+      startTime: data.appointmentTime.time,
+      endTime,
+      totalPrice: parseFloat(service.price),
+      notes: data.customerInfo.notes || undefined,
+    }
+
+    const result = await createBookingWithNotification(bookingData)
+    if ('error' in result) return { error: result.error }
+
+    return {
+      success: true,
+      bookingId: result.success.bookingId,
+      redirectUrl: `/booking-processing?bookingId=${result.success.bookingId}`
+    }
+  } catch (error) {
+    console.error("createEnhancedBookingAction error:", error)
+    return { error: "Failed to create booking. Please try again." }
   }
 }
