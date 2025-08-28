@@ -1,4 +1,4 @@
-// UPDATED FILE: app/book/[serviceId]/page.tsx
+// FIXED FILE: app/book/[serviceId]/page.tsx
 import { db } from '@/server'
 import { services } from "@/server/schema"
 import { eq } from 'drizzle-orm'
@@ -7,7 +7,10 @@ import MultiStepBookingForm from "@/app/components/booking/multi-step-booking-fo
 import { Suspense } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { CalendarDays } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { CalendarDays, Clock, DollarSign, ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
+import Image from 'next/image'
 
 // Generate static params for all active services
 export async function generateStaticParams(): Promise<{ serviceId: string }[]> {
@@ -61,10 +64,11 @@ export const dynamic = 'force-dynamic'
 export const dynamicParams = true
 export const revalidate = 3600 // Revalidate every hour
 
+// FIXED: Using the working params interface (not Promise-wrapped)
 interface BookingPageProps {
-  params: Promise<{
+  params: {
     serviceId: string
-  }>
+  }
 }
 
 // Loading component
@@ -126,6 +130,101 @@ function BookingFormSkeleton() {
   )
 }
 
+// Service showcase component
+async function ServiceShowcase({ currentServiceId }: { currentServiceId: string }) {
+  try {
+    const otherServices = await db.query.services.findMany({
+      where: eq(services.isActive, true),
+      orderBy: (services, { desc }) => [desc(services.createdAt)],
+      limit: 3
+    })
+
+    const filteredServices = otherServices.filter(s => s.id !== currentServiceId)
+
+    if (filteredServices.length === 0) return null
+
+    return (
+      <Card className="mt-12 bg-slate-50 border-slate-200">
+        <CardHeader>
+          <CardTitle className="text-2xl text-slate-800 text-center">
+            Other Available Services
+          </CardTitle>
+          <p className="text-slate-600 text-center">
+            Explore more of our professional services
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredServices.slice(0, 3).map((service) => (
+              <Card key={service.id} className="group hover:shadow-md transition-all duration-200 bg-white border-slate-200 hover:border-amber-300">
+                <CardContent className="p-4">
+                  {service.imageUrl && (
+                    <div className="relative w-full h-32 mb-3 rounded-lg overflow-hidden bg-slate-100">
+                      <Image
+                        src={service.imageUrl}
+                        alt={service.name}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                    </div>
+                  )}
+                  <h3 className="font-semibold text-slate-800 mb-2 line-clamp-1">
+                    {service.name}
+                  </h3>
+                  {service.description && (
+                    <p className="text-sm text-slate-600 mb-3 line-clamp-2">
+                      {service.description}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                      {service.duration && (
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          <span>{service.duration}min</span>
+                        </div>
+                      )}
+                      {service.price && (
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-3 w-3" />
+                          <span>${service.price}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {service.category && (
+                    <Badge variant="secondary" className="mb-3 text-xs">
+                      {service.category}
+                    </Badge>
+                  )}
+                  <Link
+                    href={`/book/${service.id}`}
+                    className="block w-full text-center bg-amber-600 hover:bg-amber-700 text-white py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
+                  >
+                    Book Now
+                  </Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <div className="text-center mt-6">
+            <Link
+              href="/services"
+              className="inline-flex items-center gap-2 text-amber-600 hover:text-amber-700 font-medium"
+            >
+              View All Services
+              <ArrowLeft className="h-4 w-4 rotate-180" />
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  } catch (error) {
+    console.error('Error loading service showcase:', error)
+    return null
+  }
+}
+
 // Main booking content component
 async function BookingPageContent({ serviceId }: { serviceId: string }) {
   try {
@@ -153,12 +252,12 @@ async function BookingPageContent({ serviceId }: { serviceId: string }) {
                 <p className="text-orange-700 mb-6">
                   This service is currently unavailable for booking.
                 </p>
-                <a 
+                <Link 
                   href="/services" 
                   className="inline-block bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 transition-colors font-semibold"
                 >
                   Browse Available Services
-                </a>
+                </Link>
               </CardContent>
             </Card>
           </div>
@@ -179,16 +278,73 @@ async function BookingPageContent({ serviceId }: { serviceId: string }) {
 
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-slate-800 mb-2">
-            Book Your Appointment
-          </h1>
-          <p className="text-lg text-slate-600">
-            Complete the form below to secure your slot
-          </p>
+        {/* Back button */}
+        <div className="max-w-4xl mx-auto mb-6">
+          <Link
+            href="/services"
+            className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Services
+          </Link>
         </div>
-        
-        <MultiStepBookingForm service={serviceData} />
+
+        {/* Service Header */}
+        <Card className="max-w-4xl mx-auto mb-8 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
+          <CardHeader>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="space-y-2">
+                <h1 className="text-3xl font-bold text-slate-800">
+                  {service.name}
+                </h1>
+                {service.description && (
+                  <p className="text-slate-600">
+                    {service.description}
+                  </p>
+                )}
+                {service.category && (
+                  <Badge variant="secondary">
+                    {service.category}
+                  </Badge>
+                )}
+              </div>
+              <div className="text-right">
+                {service.price && (
+                  <div className="text-3xl font-bold text-amber-600">
+                    ${service.price}
+                  </div>
+                )}
+                {service.duration && (
+                  <div className="text-slate-600 flex items-center gap-1 justify-end">
+                    <Clock className="h-4 w-4" />
+                    <span>{service.duration} minutes</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
+        {/* Main booking form */}
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8 text-center">
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">
+              Book Your Appointment
+            </h2>
+            <p className="text-lg text-slate-600">
+              Complete the form below to secure your slot
+            </p>
+          </div>
+          
+          <MultiStepBookingForm service={serviceData} />
+        </div>
+
+        {/* Service showcase */}
+        <div className="max-w-4xl mx-auto">
+          <Suspense fallback={null}>
+            <ServiceShowcase currentServiceId={serviceId} />
+          </Suspense>
+        </div>
       </div>
     )
 
@@ -209,12 +365,12 @@ async function BookingPageContent({ serviceId }: { serviceId: string }) {
               <p className="text-red-700 mb-6">
                 There was an error loading this service. Please try again.
               </p>
-              <a 
+              <Link 
                 href="/services" 
                 className="inline-block bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors font-semibold"
               >
                 Back to Services
-              </a>
+              </Link>
             </CardContent>
           </Card>
         </div>
@@ -223,11 +379,9 @@ async function BookingPageContent({ serviceId }: { serviceId: string }) {
   }
 }
 
-// Main page component - FIXED: Now properly awaits params
-export default async function BookingPage({ params }: BookingPageProps) {
-  // CRITICAL FIX: Await the params promise
-  const resolvedParams = await params
-  const { serviceId } = resolvedParams
+// FIXED: Main page component using working params pattern
+export default function BookingPage({ params }: BookingPageProps) {
+  const { serviceId } = params
 
   return (
     <Suspense fallback={<BookingFormSkeleton />}>

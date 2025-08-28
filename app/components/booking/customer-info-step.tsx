@@ -143,14 +143,14 @@ export default function CustomerInfoStep({
           {/* Phone Number */}
           <div className="space-y-2">
             <Label htmlFor="phone" className="text-sm font-medium text-slate-700">
-              Phone Number *
+                Whatsapp Number *
             </Label>
             <div className="relative">
               <Phone className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
               <Input
                 id="phone"
                 type="tel"
-                placeholder="Enter your phone number"
+                placeholder="Enter your whatsapp number"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
                 className={`pl-10 ${errors.phone ? 'border-red-300 focus:border-red-500' : ''}`}
