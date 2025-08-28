@@ -4,7 +4,7 @@ import { relations } from 'drizzle-orm';
 
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['user', 'admin']);
-export const bookingStatusEnum = pgEnum('booking_status', ['pending', 'confirmed', 'completed', 'cancelled', 'no_show']);
+export const bookingStatusEnum = pgEnum('booking_status', ['pending', 'completed', 'cancelled', 'no_show']);
 export const dayOfWeekEnum = pgEnum('day_of_week', ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 
 // Users table (extends NextAuth schema)
