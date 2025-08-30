@@ -172,14 +172,6 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
   if (status === 'loading') {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
-        <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
-          <CardHeader>
-            <div className="animate-pulse">
-              <div className="h-8 bg-amber-200 rounded w-64 mb-2"></div>
-              <div className="h-4 bg-amber-100 rounded w-96"></div>
-            </div>
-          </CardHeader>
-        </Card>
         <Card>
           <CardContent className="p-6">
             <div className="text-center">
@@ -196,28 +188,6 @@ export default function MultiStepBookingForm({ service }: MultiStepBookingFormPr
   if (!session) {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
-        <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="space-y-2">
-                <CardTitle className="text-2xl text-slate-800">{service.name}</CardTitle>
-                {service.description && (
-                  <p className="text-slate-600">{service.description}</p>
-                )}
-                {service.category && (
-                  <Badge variant="secondary" className="w-fit">
-                    {service.category.charAt(0).toUpperCase() + service.category.slice(1)}
-                  </Badge>
-                )}
-              </div>
-              <div className="text-right">
-                <div className="text-3xl font-bold text-amber-700">{formatPrice(service.price)}</div>
-                <div className="text-sm text-slate-600">{service.duration} minutes</div>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
             <CardTitle className="text-blue-800 flex items-center gap-2">
