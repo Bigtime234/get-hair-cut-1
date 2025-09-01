@@ -1,6 +1,9 @@
 import React from 'react'
 import HeroSection from "@/app/homepage/HeroSection"
 import ServiceShowcase from "@/app/components/service/service-showcase"
+import SocialProofSection from "@/app/homepage/SocialProofSection"
+import TransformationCarousel from "@/app/homepage/TransformationCarousel"
+import TrustSignals from "@/app/homepage/TrustSignals"
 import { db } from "@/server"
 import { services } from "@/server/schema"
 import { eq, desc } from "drizzle-orm"
@@ -78,22 +81,27 @@ const HomePage = async () => {
 
   return (
     <div className='min-h-screen'>
+      {/* Hero Section */}
       <HeroSection />
+
+
+      {/* Transformation Carousel */}
+      <TransformationCarousel />
       
-      {/* Featured Services Section */}
+      {/* Featured Services Section - Your existing database-driven content */}
       <section className="py-20 bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <div className="container mx-auto px-8 max-w-6xl">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white px-6 py-3 rounded-full text-sm font-bold mb-8 shadow-lg">
               <Award className="w-5 h-5" />
-              FEATURED SERVICES
+              YOUR SERVICES
               <Zap className="w-4 h-4" />
             </div>
             <h2 className="text-5xl font-black text-slate-900 mb-6 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
-              Master Barber Services
+              Our Premium Services
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
-              Experience the artistry of premium barbering with our handcrafted services designed to elevate your style
+              Real services from our database - book directly and experience the difference
             </p>
           </div>
 
@@ -351,6 +359,12 @@ const HomePage = async () => {
           )}
         </div>
       </section>
+
+      {/* Social Proof Section */}
+      <SocialProofSection />
+
+      {/* Trust Signals */}
+      <TrustSignals />
 
       {/* Ultra-Premium Call to Action Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-black py-20">

@@ -2,7 +2,7 @@
 
 import { db } from "@/server"
 import { workingHours, blockedTimes, bookings } from "@/server/schema"
-import { eq, and, gte, lte } from "drizzle-orm"
+import { eq, and, gte, lte, ne } from "drizzle-orm"
 
 export type TimeSlot = {
   time: string
@@ -58,11 +58,12 @@ export async function getAvailableSlots(
     const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0, 0)
     const endOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59, 999)
 
-    // Get all existing bookings for this date
+    // Get all existing bookings for this date (exclude cancelled bookings)
     const existingBookings = await db.query.bookings.findMany({
       where: and(
         gte(bookings.appointmentDate, startOfDay),
-        lte(bookings.appointmentDate, endOfDay)
+        lte(bookings.appointmentDate, endOfDay),
+        ne(bookings.status, 'cancelled')
       ),
     })
 
@@ -71,8 +72,8 @@ export async function getAvailableSlots(
     const startTime = parseTime(hours.startTime)
     const endTime = parseTime(hours.endTime)
     
-    // Create 30-minute intervals
-    const slotInterval = 30 // minutes
+    // Create intervals based on service duration
+    const slotInterval = serviceDuration // Use actual service duration instead of fixed 30 minutes
     let currentTime = startTime
 
     while (currentTime < endTime) {
@@ -145,14 +146,14 @@ function parseTime(timeString: string): number {
   return hours * 60 + minutes
 }
 
-// Helper function to format minutes since midnight to time string (HH:MM)
+
 function formatTime(minutes: number): string {
   const hours = Math.floor(minutes / 60)
   const mins = minutes % 60
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`
 }
 
-// Helper function to get day of week from date
+
 export async function getDayOfWeek(date: Date): Promise<string> {
   return date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
 }

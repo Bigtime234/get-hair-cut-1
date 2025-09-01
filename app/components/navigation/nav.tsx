@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect, ReactElement } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { 
@@ -40,8 +40,15 @@ interface ButtonProps {
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+  const pathname = usePathname(); // Use Next.js pathname hook instead
   const { data: session, status } = useSession();
+
+  // Handle mounting to prevent hydration issues
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -53,22 +60,21 @@ const Header = () => {
   }, []);
 
   const navigationItems: NavigationItem[] = [
-    { name: 'Home', path: '/homepage', icon: Home },
-    { name: 'Master Profile', path: '/master-s-profile', icon: User },
-    { name: 'Book Now', path: '/booking-engine', icon: Calendar },
-    { name: 'Client Portal', path: '/client-portal', icon: Users },
-    { name: 'Reviews', path: '/reviews-testimonials', icon: Star },
+    { name: 'Home', path: '/', icon: Home },
+    { name: 'Master Profile', path: '/masters-profle', icon: User },
+    { name: 'Book Now', path: '/components/service', icon: Calendar },
+    { name: 'Client Portal', path: '/bookings', icon: Users },
+    { name: 'Reviews', path: '/reviews-testimonial', icon: Star },
   ];
 
   const secondaryItems: NavigationItem[] = [
     { name: 'Contact', path: '/contact-location', icon: MapPin },
   ];
 
+  // Use pathname from Next.js router instead of window.location
   const isActivePath = (path: string): boolean => {
-    if (typeof window !== 'undefined') {
-      return window.location.pathname === path;
-    }
-    return false;
+    if (!mounted) return false; // Prevent hydration mismatch
+    return pathname === path;
   };
 
   const handleNavigation = (path: string): void => {
@@ -118,6 +124,140 @@ const Header = () => {
     );
   };
 
+  // Don't render active states until component is mounted
+  if (!mounted) {
+    return (
+      <>
+        <header 
+          className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+            isScrolled 
+              ? 'bg-white/95 backdrop-blur-md shadow-md' 
+              : 'bg-transparent'
+          }`}
+        >
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between h-16 lg:h-20">
+              {/* Logo */}
+              <Link 
+                href="/homepage"
+                className="flex items-center cursor-pointer group"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300">
+                      <Scissors size={20} color="white" className="lg:w-6 lg:h-6" />
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-lg lg:text-xl text-gray-800 group-hover:text-blue-600 transition-colors duration-300">
+                      BarberBook
+                    </span>
+                    <span className="text-sm text-orange-500 -mt-1">
+                      Pro
+                    </span>
+                  </div>
+                </div>
+              </Link>
+
+              {/* Desktop Navigation - Default state */}
+              <nav className="hidden lg:flex items-center space-x-8">
+                {navigationItems.map((item) => {
+                  const IconComponent = item.icon;
+                  return (
+                    <button
+                      key={item.path}
+                      onClick={() => handleNavigation(item.path)}
+                      className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-300 hover:scale-105 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    >
+                      <IconComponent size={18} className="text-current" />
+                      <span>{item.name}</span>
+                    </button>
+                  );
+                })}
+                
+                {/* More Menu */}
+                <div className="relative group">
+                  <button className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-300">
+                    <MoreHorizontal size={18} />
+                    <span>More</span>
+                  </button>
+                  
+                  {/* Dropdown */}
+                  <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-10">
+                    {secondaryItems.map((item) => {
+                      const IconComponent = item.icon;
+                      return (
+                        <button
+                          key={item.path}
+                          onClick={() => handleNavigation(item.path)}
+                          className="w-full flex items-center space-x-3 px-4 py-3 text-left font-medium hover:bg-gray-100 transition-colors duration-300 first:rounded-t-lg last:rounded-b-lg text-gray-600"
+                        >
+                          <IconComponent size={16} />
+                          <span>{item.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </nav>
+
+              {/* Right Side: CTA Button, User Button & Mobile Menu Toggle */}
+              <div className="flex items-center space-x-3 lg:space-x-4">
+                {/* Book Now Button - Hidden on small screens when user is logged in */}
+                <Button
+                  variant="default"
+                  className={`bg-blue-600 hover:bg-blue-700 text-white animate-pulse ${
+                    session ? 'hidden md:flex' : 'hidden sm:flex'
+                  }`}
+                  onClick={() => handleNavigation('/booking-engine')}
+                  iconName={Calendar}
+                  iconPosition="left"
+                  iconSize={18}
+                >
+                  Book Now
+                </Button>
+
+                {/* User Button - Visible when authenticated */}
+                {status === 'authenticated' && session && (
+                  <div className="flex items-center">
+                    <UserButton {...session} />
+                  </div>
+                )}
+
+                {/* Sign In Button - Visible when not authenticated */}
+                {status === 'unauthenticated' && (
+                  <Button
+                    variant="outline"
+                    className="hidden sm:flex border-blue-600 text-blue-600 hover:bg-blue-50"
+                    onClick={() => handleNavigation('/api/auth/signin')}
+                    iconName={User}
+                    iconPosition="left"
+                    iconSize={18}
+                  >
+                    Sign In
+                  </Button>
+                )}
+
+                {/* Mobile Menu Toggle */}
+                <button
+                  onClick={toggleMobileMenu}
+                  className="lg:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-300"
+                  aria-label="Toggle mobile menu"
+                >
+                  {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+        
+        {/* Spacer for fixed header */}
+        <div className="h-16 lg:h-20"></div>
+      </>
+    );
+  }
+
   return (
     <>
       <header 
@@ -156,19 +296,20 @@ const Header = () => {
             <nav className="hidden lg:flex items-center space-x-8">
               {navigationItems.map((item) => {
                 const IconComponent = item.icon;
+                const isActive = isActivePath(item.path);
                 return (
                   <button
                     key={item.path}
                     onClick={() => handleNavigation(item.path)}
                     className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-300 hover:scale-105 ${
-                      isActivePath(item.path)
+                      isActive
                         ? 'text-blue-600 bg-blue-100 shadow-md'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                     }`}
                   >
                     <IconComponent 
                       size={18} 
-                      className={isActivePath(item.path) ? 'text-blue-600' : 'text-current'} 
+                      className={isActive ? 'text-blue-600' : 'text-current'} 
                     />
                     <span>{item.name}</span>
                   </button>
@@ -186,12 +327,13 @@ const Header = () => {
                 <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-10">
                   {secondaryItems.map((item) => {
                     const IconComponent = item.icon;
+                    const isActive = isActivePath(item.path);
                     return (
                       <button
                         key={item.path}
                         onClick={() => handleNavigation(item.path)}
                         className={`w-full flex items-center space-x-3 px-4 py-3 text-left font-medium hover:bg-gray-100 transition-colors duration-300 first:rounded-t-lg last:rounded-b-lg ${
-                          isActivePath(item.path) ? 'text-blue-600 bg-blue-100' : 'text-gray-600'
+                          isActive ? 'text-blue-600 bg-blue-100' : 'text-gray-600'
                         }`}
                       >
                         <IconComponent size={16} />
@@ -299,19 +441,20 @@ const Header = () => {
             <nav className="p-6 space-y-2">
               {[...navigationItems, ...secondaryItems].map((item) => {
                 const IconComponent = item.icon;
+                const isActive = isActivePath(item.path);
                 return (
                   <button
                     key={item.path}
                     onClick={() => handleNavigation(item.path)}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-left transition-all duration-300 ${
-                      isActivePath(item.path)
+                      isActive
                         ? 'text-blue-600 bg-blue-100 shadow-md'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                     }`}
                   >
                     <IconComponent 
                       size={20} 
-                      className={isActivePath(item.path) ? 'text-blue-600' : 'text-current'} 
+                      className={isActive ? 'text-blue-600' : 'text-current'} 
                     />
                     <span>{item.name}</span>
                   </button>
@@ -338,7 +481,7 @@ const Header = () => {
                     variant="outline"
                     fullWidth
                     className="border-blue-600 text-blue-600 hover:bg-blue-50"
-                    onClick={() => handleNavigation('/api/auth/signin')}
+                    onClick={() => handleNavigation('/login')}
                     iconName={User}
                     iconPosition="left"
                     iconSize={18}
