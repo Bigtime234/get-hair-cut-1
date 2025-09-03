@@ -110,8 +110,8 @@ export async function getBookingsForDate(date: Date) {
       where: and(
         gte(bookings.appointmentDate, startOfDay),
         lte(bookings.appointmentDate, endOfDay),
-        // Only confirmed and pending bookings block slots
-        eq(bookings.status, 'confirmed') || eq(bookings.status, 'pending')
+        // Only pending bookings block slots
+        eq(bookings.status, 'pending')
       ),
       with: {
         service: true

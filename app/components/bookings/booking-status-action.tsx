@@ -36,9 +36,9 @@ import {
   MoreHorizontal, CheckCircle, X, AlertTriangle, 
   Clock, Eye, Loader2 
 } from "lucide-react"
-import { updateBookingStatus } from "@/lib/actions/update-booking-status"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { updateBookStatus } from "@/lib/actions/update-book-status"
 
 type BookingStatusActionsProps = {
   bookingId: string
@@ -58,13 +58,13 @@ export function BookingStatusActions({
   const [showCancelDialog, setShowCancelDialog] = useState(false)
 
   const handleStatusUpdate = async (
-    newStatus: "pending" | "confirmed" | "completed" | "cancelled" | "no_show",
+    newStatus: "pending" | "completed" | "cancelled" | "no_show",
     reason?: string
   ) => {
     setIsLoading(true)
     
     try {
-      await updateBookingStatus(bookingId, newStatus, reason)
+      await updateBookStatus(bookingId, newStatus, reason)
       toast.success(`Booking ${newStatus} successfully`)
       onStatusChange?.()
     } catch (error) {
@@ -127,7 +127,7 @@ export function BookingStatusActions({
           {currentStatus === "pending" && (
             <>
               <DropdownMenuItem 
-                onClick={() => handleStatusUpdate("confirmed")}
+                onClick={() => handleStatusUpdate("completed")}
                 className="text-blue-600 focus:text-blue-600"
               >
                 <CheckCircle className="mr-2 h-4 w-4" />
@@ -280,7 +280,7 @@ export function QuickStatusActions({
   const [isLoading, setIsLoading] = useState(false)
 
   const handleQuickUpdate = async (
-    newStatus: "confirmed" | "completed" | "cancelled"
+    newStatus: "pending"  | "completed" | "cancelled"
   ) => {
     setIsLoading(true)
     
@@ -290,7 +290,7 @@ export function QuickStatusActions({
         reason = "Quick cancellation by admin"
       }
       
-      await updateBookingStatus(bookingId, newStatus, reason)
+      await updateBookStatus(bookingId, newStatus, reason)
       toast.success(`Booking ${newStatus} successfully`)
       onStatusChange?.()
     } catch (error) {
@@ -305,7 +305,7 @@ export function QuickStatusActions({
       <div className={cn("flex gap-1", { "flex-col": !compact })}>
         <Button 
           size="sm" 
-          onClick={() => handleQuickUpdate("confirmed")}
+          onClick={() => handleQuickUpdate("completed")}
           disabled={isLoading}
           className="bg-blue-600 hover:bg-blue-700 text-white"
         >

@@ -9,9 +9,7 @@ function timeToMinutes(time: string): number {
 // Blocked Time Schema
 export const BlockedTimeSchema = z.object({
   id: z.string().optional(),
-  date: z.date({
-    required_error: "Date is required",
-  }),
+  date: z.date(),
   startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
     message: "Invalid time format (HH:MM)",
   }).optional(),

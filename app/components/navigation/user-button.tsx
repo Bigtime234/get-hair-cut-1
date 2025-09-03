@@ -99,7 +99,7 @@ export const UserButton = ({ user: initialUser }: Session) => {
 
           {/* My Appointments */}
           <DropdownMenuItem
-            onClick={() => router.push("/dashboard/appointments")}
+            onClick={() => router.push("/bookings")}
             className="group py-3 px-4 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200"
           >
             <div className="flex items-center gap-3">

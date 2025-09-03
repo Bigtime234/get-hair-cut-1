@@ -14,7 +14,9 @@ import {
   Menu, 
   X, 
   Scissors,
-  LucideIcon
+  Crown,
+  Award,
+  Phone
 } from 'lucide-react';
 
 // Import your UserButton component
@@ -23,7 +25,7 @@ import { UserButton } from './user-button';
 interface NavigationItem {
   name: string;
   path: string;
-  icon: LucideIcon;
+  icon: any;
 }
 
 interface ButtonProps {
@@ -31,7 +33,7 @@ interface ButtonProps {
   variant?: 'default' | 'outline' | 'ghost';
   className?: string;
   onClick?: () => void;
-  iconName?: LucideIcon;
+  iconName?: any;
   iconPosition?: 'left' | 'right';
   iconSize?: number;
   fullWidth?: boolean;
@@ -42,10 +44,9 @@ const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const pathname = usePathname(); // Use Next.js pathname hook instead
+  const pathname = usePathname();
   const { data: session, status } = useSession();
 
-  // Handle mounting to prevent hydration issues
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -61,19 +62,18 @@ const Header = () => {
 
   const navigationItems: NavigationItem[] = [
     { name: 'Home', path: '/', icon: Home },
-    { name: 'Master Profile', path: '/masters-profle', icon: User },
-    { name: 'Book Now', path: '/components/service', icon: Calendar },
-    { name: 'Client Portal', path: '/bookings', icon: Users },
-    { name: 'Reviews', path: '/reviews-testimonial', icon: Star },
+    { name: 'Master Profiles', path: '/masters-profle', icon: Crown },
+    { name: 'Services', path: '/components/service', icon: Scissors },
+    { name: 'My Bookings', path: '/bookings', icon: Calendar },
   ];
 
   const secondaryItems: NavigationItem[] = [
-    { name: 'Contact', path: '/contact-location', icon: MapPin },
+    { name: 'Contact Us', path: '/contact', icon: MapPin },
+    { name: 'About', path: '/about', icon: Award },
   ];
 
-  // Use pathname from Next.js router instead of window.location
   const isActivePath = (path: string): boolean => {
-    if (!mounted) return false; // Prevent hydration mismatch
+    if (!mounted) return false;
     return pathname === path;
   };
 
@@ -86,7 +86,6 @@ const Header = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  // Button Component with Lucide Icons
   const Button = ({ 
     children, 
     variant = 'default', 
@@ -97,7 +96,6 @@ const Header = () => {
     iconSize = 18,
     fullWidth = false 
   }: ButtonProps): ReactElement => {
-    // Render icon only if iconName is provided
     const renderIcon = (position: 'left' | 'right') => {
       if (!iconName || iconPosition !== position) return null;
       
@@ -109,10 +107,10 @@ const Header = () => {
       <button
         onClick={onClick}
         className={`
-          inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-300
-          ${variant === 'default' ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}
-          ${variant === 'outline' ? 'border border-gray-300 hover:bg-gray-100' : ''}
-          ${variant === 'ghost' ? 'hover:bg-gray-100' : ''}
+          inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg font-medium transition-all duration-300
+          ${variant === 'default' ? 'bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-black shadow-lg hover:shadow-xl' : ''}
+          ${variant === 'outline' ? 'border-2 border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-black' : ''}
+          ${variant === 'ghost' ? 'hover:bg-gray-100 text-gray-700' : ''}
           ${fullWidth ? 'w-full' : ''}
           ${className}
         `}
@@ -124,51 +122,50 @@ const Header = () => {
     );
   };
 
-  // Don't render active states until component is mounted
   if (!mounted) {
     return (
       <>
         <header 
-          className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
             isScrolled 
-              ? 'bg-white/95 backdrop-blur-md shadow-md' 
-              : 'bg-transparent'
+              ? 'bg-black/95 backdrop-blur-xl shadow-2xl border-b border-amber-500/20' 
+              : 'bg-gradient-to-b from-black/80 to-transparent backdrop-blur-sm'
           }`}
         >
-          <div className="container mx-auto px-4">
-            <div className="flex items-center justify-between h-16 lg:h-20">
-              {/* Logo */}
+          <div className="w-full px-3 sm:px-4 lg:px-8">
+            <div className="flex items-center justify-between h-16 sm:h-18 lg:h-22">
+              {/* Logo - Simplified for mobile */}
               <Link 
-                href="/homepage"
-                className="flex items-center cursor-pointer group"
+                href="/"
+                className="flex items-center cursor-pointer group min-w-0"
               >
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300">
-                      <Scissors size={20} color="white" className="lg:w-6 lg:h-6" />
+                <div className="flex items-center space-x-2 sm:space-x-4">
+                  <div className="relative flex-shrink-0">
+                    <div className="w-8 h-8 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transition-all duration-500 border border-amber-300/30">
+                      <Scissors size={16} color="black" className="sm:w-6 sm:h-6 lg:w-7 lg:h-7 rotate-45 group-hover:rotate-90 transition-transform duration-500" />
                     </div>
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
+                    <div className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded-full animate-pulse shadow-lg"></div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="font-bold text-lg lg:text-xl text-gray-800 group-hover:text-blue-600 transition-colors duration-300">
-                      BarberBook
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-sm sm:text-xl lg:text-2xl text-white group-hover:text-amber-400 transition-colors duration-300 tracking-wide truncate">
+                      ELITE
                     </span>
-                    <span className="text-sm text-orange-500 -mt-1">
-                      Pro
+                    <span className="text-xs sm:text-sm text-amber-400 -mt-0.5 sm:-mt-1 font-medium  tracking-wider">
+                      BARBERSHOP
                     </span>
                   </div>
                 </div>
               </Link>
 
-              {/* Desktop Navigation - Default state */}
-              <nav className="hidden lg:flex items-center space-x-8">
+              {/* Desktop Navigation */}
+              <nav className="hidden lg:flex items-center space-x-2">
                 {navigationItems.map((item) => {
                   const IconComponent = item.icon;
                   return (
                     <button
                       key={item.path}
                       onClick={() => handleNavigation(item.path)}
-                      className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-300 hover:scale-105 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      className="flex items-center space-x-2 px-5 py-3 rounded-xl font-medium transition-all duration-300 hover:scale-105 text-gray-300 hover:text-amber-400 hover:bg-white/10 backdrop-blur-sm border border-transparent hover:border-amber-500/30"
                     >
                       <IconComponent size={18} className="text-current" />
                       <span>{item.name}</span>
@@ -178,20 +175,19 @@ const Header = () => {
                 
                 {/* More Menu */}
                 <div className="relative group">
-                  <button className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-300">
+                  <button className="flex items-center space-x-2 px-5 py-3 rounded-xl font-medium text-gray-300 hover:text-amber-400 hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-amber-500/30">
                     <MoreHorizontal size={18} />
                     <span>More</span>
                   </button>
                   
-                  {/* Dropdown */}
-                  <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-10">
+                  <div className="absolute top-full right-0 mt-3 w-56 bg-black/95 backdrop-blur-xl rounded-xl shadow-2xl border border-amber-500/20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-20">
                     {secondaryItems.map((item) => {
                       const IconComponent = item.icon;
                       return (
                         <button
                           key={item.path}
                           onClick={() => handleNavigation(item.path)}
-                          className="w-full flex items-center space-x-3 px-4 py-3 text-left font-medium hover:bg-gray-100 transition-colors duration-300 first:rounded-t-lg last:rounded-b-lg text-gray-600"
+                          className="w-full flex items-center space-x-3 px-5 py-4 text-left font-medium hover:bg-amber-500/10 transition-colors duration-300 first:rounded-t-xl last:rounded-b-xl text-gray-300 hover:text-amber-400"
                         >
                           <IconComponent size={16} />
                           <span>{item.name}</span>
@@ -202,35 +198,41 @@ const Header = () => {
                 </div>
               </nav>
 
-              {/* Right Side: CTA Button, User Button & Mobile Menu Toggle */}
-              <div className="flex items-center space-x-3 lg:space-x-4">
-                {/* Book Now Button - Hidden on small screens when user is logged in */}
+              {/* Right Side - Mobile Optimized */}
+              <div className="flex items-center space-x-1 sm:space-x-4 flex-shrink-0">
+                {/* Call Button - Hidden on small mobile, icon only on medium */}
                 <Button
-                  variant="default"
-                  className={`bg-blue-600 hover:bg-blue-700 text-white animate-pulse ${
-                    session ? 'hidden md:flex' : 'hidden sm:flex'
-                  }`}
-                  onClick={() => handleNavigation('/booking-engine')}
-                  iconName={Calendar}
+                  variant="outline"
+                  className="hidden md:flex border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black font-semibold"
+                  onClick={() => window.open('tel:+1555123CUTS')}
+                  iconName={Phone}
                   iconPosition="left"
                   iconSize={18}
                 >
-                  Book Now
+                  (555) 123-CUTS
                 </Button>
 
-                {/* User Button - Visible when authenticated */}
+                {/* Phone icon only for small screens */}
+                <button
+                  onClick={() => window.open('tel:+1555123CUTS')}
+                  className="md:hidden p-2 sm:p-3 rounded-lg border-2 border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black transition-all duration-300"
+                >
+                  <Phone size={16} className="sm:w-5 sm:h-5" />
+                </button>
+
+                {/* User Button */}
                 {status === 'authenticated' && session && (
                   <div className="flex items-center">
                     <UserButton {...session} />
                   </div>
                 )}
 
-                {/* Sign In Button - Visible when not authenticated */}
+                {/* Sign In Button - Hidden on mobile */}
                 {status === 'unauthenticated' && (
                   <Button
-                    variant="outline"
-                    className="hidden sm:flex border-blue-600 text-blue-600 hover:bg-blue-50"
-                    onClick={() => handleNavigation('/api/auth/signin')}
+                    variant="default"
+                    className="hidden sm:flex"
+                    onClick={() => handleNavigation('/login')}
                     iconName={User}
                     iconPosition="left"
                     iconSize={18}
@@ -242,18 +244,17 @@ const Header = () => {
                 {/* Mobile Menu Toggle */}
                 <button
                   onClick={toggleMobileMenu}
-                  className="lg:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-300"
+                  className="lg:hidden p-2 sm:p-3 rounded-lg text-white hover:text-amber-400 hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-amber-500/30 flex-shrink-0"
                   aria-label="Toggle mobile menu"
                 >
-                  {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                  {isMobileMenuOpen ? <X size={20} className="sm:w-6 sm:h-6" /> : <Menu size={20} className="sm:w-6 sm:h-6" />}
                 </button>
               </div>
             </div>
           </div>
         </header>
         
-        {/* Spacer for fixed header */}
-        <div className="h-16 lg:h-20"></div>
+        <div className="h-16 sm:h-18 lg:h-22"></div>
       </>
     );
   }
@@ -261,55 +262,56 @@ const Header = () => {
   return (
     <>
       <header 
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
           isScrolled 
-            ? 'bg-white/95 backdrop-blur-md shadow-md' 
-            : 'bg-transparent'
+            ? 'bg-black/95 backdrop-blur-xl shadow-2xl border-b border-amber-500/20' 
+            : 'bg-gradient-to-b from-black/80 to-transparent backdrop-blur-sm'
         }`}
       >
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16 lg:h-20">
-            {/* Logo */}
+        <div className="w-full px-3 sm:px-4 lg:px-8">
+          <div className="flex items-center justify-between h-16 sm:h-18 lg:h-22">
+            {/* Logo - Mobile Optimized */}
             <Link 
-              href="/homepage"
-              className="flex items-center cursor-pointer group"
+              href="/"
+              className="flex items-center cursor-pointer group min-w-0 flex-shrink-0"
             >
-              <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300">
-                    <Scissors size={20} color="white" className="lg:w-6 lg:h-6" />
+              <div className="flex items-center space-x-2 sm:space-x-4">
+                <div className="relative flex-shrink-0">
+                  <div className="w-8 h-8 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transition-all duration-500 border border-amber-300/30">
+                    <Scissors size={16} color="black" className="sm:w-6 sm:h-6 lg:w-7 lg:h-7 rotate-45 group-hover:rotate-90 transition-transform duration-500" />
                   </div>
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
+                  <div className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded-full animate-pulse shadow-lg"></div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-lg lg:text-xl text-gray-800 group-hover:text-blue-600 transition-colors duration-300">
-                    BarberBook
+                <div className="flex flex-col min-w-0">
+                  <span className="font-bold text-sm sm:text-xl lg:text-2xl text-white group-hover:text-amber-400 transition-colors duration-300 tracking-wide">
+                    ELITE CUTS
                   </span>
-                  <span className="text-sm text-orange-500 -mt-1">
-                    Pro
+                  <span className="text-xs sm:text-sm text-amber-400 -mt-0.5 sm:-mt-1 font-medium tracking-wider">
+                    BARBERSHOP
                   </span>
                 </div>
               </div>
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden lg:flex items-center space-x-8">
-              {navigationItems.map((item) => {
+            <nav className="hidden lg:flex items-center space-x-2">
+              {navigationItems.map((item, index) => {
                 const IconComponent = item.icon;
                 const isActive = isActivePath(item.path);
+                const uniqueDesktopKey = `desktop-${index}-${item.name.replace(/\s+/g, '-').toLowerCase()}`;
                 return (
                   <button
-                    key={item.path}
+                    key={uniqueDesktopKey}
                     onClick={() => handleNavigation(item.path)}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-300 hover:scale-105 ${
+                    className={`flex items-center space-x-2 px-5 py-3 rounded-xl font-medium transition-all duration-300 hover:scale-105 backdrop-blur-sm ${
                       isActive
-                        ? 'text-blue-600 bg-blue-100 shadow-md'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                        ? 'text-black bg-gradient-to-r from-amber-400 to-yellow-500 shadow-lg border border-amber-300'
+                        : 'text-gray-300 hover:text-amber-400 hover:bg-white/10 border border-transparent hover:border-amber-500/30'
                     }`}
                   >
                     <IconComponent 
                       size={18} 
-                      className={isActive ? 'text-blue-600' : 'text-current'} 
+                      className={isActive ? 'text-black' : 'text-current'} 
                     />
                     <span>{item.name}</span>
                   </button>
@@ -318,13 +320,12 @@ const Header = () => {
               
               {/* More Menu */}
               <div className="relative group">
-                <button className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-300">
+                <button className="flex items-center space-x-2 px-5 py-3 rounded-xl font-medium text-gray-300 hover:text-amber-400 hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-amber-500/30">
                   <MoreHorizontal size={18} />
                   <span>More</span>
                 </button>
                 
-                {/* Dropdown */}
-                <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-10">
+                <div className="absolute top-full right-0 mt-3 w-56 bg-black/95 backdrop-blur-xl rounded-xl shadow-2xl border border-amber-500/20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-20">
                   {secondaryItems.map((item) => {
                     const IconComponent = item.icon;
                     const isActive = isActivePath(item.path);
@@ -332,8 +333,8 @@ const Header = () => {
                       <button
                         key={item.path}
                         onClick={() => handleNavigation(item.path)}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 text-left font-medium hover:bg-gray-100 transition-colors duration-300 first:rounded-t-lg last:rounded-b-lg ${
-                          isActive ? 'text-blue-600 bg-blue-100' : 'text-gray-600'
+                        className={`w-full flex items-center space-x-3 px-5 py-4 text-left font-medium hover:bg-amber-500/10 transition-colors duration-300 first:rounded-t-xl last:rounded-b-xl ${
+                          isActive ? 'text-amber-400 bg-amber-500/20' : 'text-gray-300 hover:text-amber-400'
                         }`}
                       >
                         <IconComponent size={16} />
@@ -345,77 +346,91 @@ const Header = () => {
               </div>
             </nav>
 
-            {/* Right Side: CTA Button, User Button & Mobile Menu Toggle */}
-            <div className="flex items-center space-x-3 lg:space-x-4">
-              {/* Book Now Button - Hidden on small screens when user is logged in */}
+            {/* Right Side - Mobile Responsive */}
+            <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-4 flex-shrink-0">
+              {/* Call Button - Responsive */}
               <Button
-                variant="default"
-                className={`bg-blue-600 hover:bg-blue-700 text-white animate-pulse ${
-                  session ? 'hidden md:flex' : 'hidden sm:flex'
-                }`}
-                onClick={() => handleNavigation('/booking-engine')}
-                iconName={Calendar}
+                variant="outline"
+                className="hidden lg:flex border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black font-semibold shadow-lg"
+                onClick={() => window.open('tel:+1555123CUTS')}
+                iconName={Phone}
                 iconPosition="left"
-                iconSize={18}
+                iconSize={8}
               >
-                Book Now
+                (555) 123-CUTS
               </Button>
 
-              {/* User Button - Visible when authenticated */}
+              {/* Phone icon only for medium screens */}
+              <button
+                onClick={() => window.open('tel:+1555123CUTS')}
+                className="hidden sm:flex lg:hidden p-2 rounded-lg border border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black transition-all duration-300"
+                title="Call us"
+              >
+                <Phone size={8} />
+              </button>
+
+              {/* User Button - Responsive */}
               {status === 'authenticated' && session && (
                 <div className="flex items-center">
                   <UserButton {...session} />
                 </div>
               )}
 
-              {/* Sign In Button - Visible when not authenticated */}
+              {/* Sign In Button - Hidden on small screens */}
               {status === 'unauthenticated' && (
                 <Button
-                  variant="outline"
-                  className="hidden sm:flex border-blue-600 text-blue-600 hover:bg-blue-50"
-                  onClick={() => handleNavigation('/api/auth/signin')}
+                  variant="default"
+                  className="hidden md:flex shadow-lg text-sm px-4"
+                  onClick={() => handleNavigation('/login')}
                   iconName={User}
                   iconPosition="left"
-                  iconSize={18}
+                  iconSize={16}
                 >
                   Sign In
                 </Button>
               )}
 
-              {/* Mobile Menu Toggle */}
+              {/* Mobile Menu Toggle - Always visible on mobile */}
               <button
                 onClick={toggleMobileMenu}
-                className="lg:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-300"
+                className="lg:hidden p-2 rounded-lg text-white hover:text-amber-400 hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-amber-500/30 flex-shrink-0"
                 aria-label="Toggle mobile menu"
               >
-                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
             </div>
           </div>
         </div>
       </header>
       
+      
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div 
-            className="absolute inset-0 bg-gray-900/80 backdrop-blur-md"
+            className="absolute inset-0 bg-black/90 backdrop-blur-md"
             onClick={() => setIsMobileMenuOpen(false)}
           ></div>
           
-          <div className="absolute top-0 right-0 w-80 max-w-[90vw] h-full bg-white shadow-xl">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="absolute top-0 right-0 w-80 max-w-[85vw] h-full bg-gradient-to-b from-gray-900 to-black shadow-2xl border-l border-amber-500/20 overflow-y-auto">
+            {/* Mobile Header */}
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-amber-500/20">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Scissors size={16} color="white" />
+                <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-yellow-600 rounded-lg flex items-center justify-center shadow-lg">
+                  <Scissors size={18} color="black" />
                 </div>
-                <span className="font-bold text-lg text-gray-800">
-                  BarberBook Pro
-                </span>
+                <div>
+                  <span className="font-bold text-lg text-white">
+                    ELITE CUTS
+                  </span>
+                  <div className="text-xs text-amber-400 font-medium tracking-wider">
+                    BARBERSHOP
+                  </div>
+                </div>
               </div>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-300"
+                className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300"
               >
                 <X size={20} />
               </button>
@@ -423,14 +438,14 @@ const Header = () => {
 
             {/* Mobile User Profile Section */}
             {status === 'authenticated' && session && (
-              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+              <div className="p-4 sm:p-6 border-b border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-yellow-500/10">
                 <div className="flex items-center space-x-4">
                   <UserButton {...session} />
                   <div className="flex flex-col min-w-0">
-                    <p className="font-semibold text-gray-800 truncate">
+                    <p className="font-semibold text-white truncate">
                       {session.user?.name}
                     </p>
-                    <p className="text-sm text-gray-600 truncate">
+                    <p className="text-sm text-amber-400 truncate">
                       {session.user?.email}
                     </p>
                   </div>
@@ -438,57 +453,80 @@ const Header = () => {
               </div>
             )}
 
-            <nav className="p-6 space-y-2">
-              {[...navigationItems, ...secondaryItems].map((item) => {
+            {/* Mobile Navigation */}
+            <nav className="p-4 sm:p-6 space-y-2">
+              {[...navigationItems, ...secondaryItems].map((item, index) => {
                 const IconComponent = item.icon;
                 const isActive = isActivePath(item.path);
+                const uniqueKey = `mobile-${index}-${item.name.replace(/\s+/g, '-').toLowerCase()}`;
+                
                 return (
-                  <button
-                    key={item.path}
-                    onClick={() => handleNavigation(item.path)}
-                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-left transition-all duration-300 ${
+                  <Link
+                    key={uniqueKey}
+                    href={item.path}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`w-full flex items-center space-x-4 px-4 py-4 rounded-xl font-medium text-left transition-all duration-300 ${
                       isActive
-                        ? 'text-blue-600 bg-blue-100 shadow-md'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                        ? 'text-black bg-gradient-to-r from-amber-400 to-yellow-500 shadow-lg'
+                        : 'text-gray-300 hover:text-amber-400 hover:bg-white/10 border border-transparent hover:border-amber-500/30'
                     }`}
                   >
                     <IconComponent 
                       size={20} 
-                      className={isActive ? 'text-blue-600' : 'text-current'} 
+                      className={isActive ? 'text-black' : 'text-current'} 
                     />
                     <span>{item.name}</span>
-                  </button>
+                  </Link>
                 );
               })}
               
-              <div className="pt-4 mt-6 border-t border-gray-200 space-y-3">
-                {/* Book Now Button for Mobile */}
+              {/* Mobile Actions */}
+              <div className="pt-4 mt-4 border-t border-amber-500/20 space-y-3">
+                {/* Call Button for Mobile */}
                 <Button
-                  variant="default"
+                  variant="outline"
                   fullWidth
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={() => handleNavigation('/booking-engine')}
-                  iconName={Calendar}
+                  className="border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black font-semibold"
+                  onClick={() => window.open('tel:+1555123CUTS')}
+                  iconName={Phone}
                   iconPosition="left"
                   iconSize={18}
                 >
-                  Book Your Transformation
+                  Call Now: (555) 123-CUTS
                 </Button>
 
-                {/* Sign In Button for Mobile - Only show if not authenticated */}
+                {/* Sign In Button for Mobile */}
                 {status === 'unauthenticated' && (
                   <Button
-                    variant="outline"
+                    variant="default"
                     fullWidth
-                    className="border-blue-600 text-blue-600 hover:bg-blue-50"
                     onClick={() => handleNavigation('/login')}
                     iconName={User}
                     iconPosition="left"
                     iconSize={18}
                   >
-                    Sign In
+                    Sign In / Register
                   </Button>
                 )}
+              </div>
+
+              {/* Mobile Contact Info */}
+              <div className="pt-4 mt-4 border-t border-amber-500/20">
+                <div className="text-center space-y-2">
+                  <p className="text-amber-400 font-medium">Open 7 Days a Week</p>
+                  <p className="text-gray-400 text-sm">Premium Grooming Experience</p>
+                  <div className="flex justify-center space-x-4 pt-4">
+                    <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center">
+                      <Crown size={16} className="text-amber-400" />
+                    </div>
+                    <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center">
+                      <Award size={16} className="text-amber-400" />
+                    </div>
+                    <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center">
+                      <Star size={16} className="text-amber-400" />
+                    </div>
+                  </div>
+                </div>
               </div>
             </nav>
           </div>
@@ -496,7 +534,7 @@ const Header = () => {
       )}
       
       {/* Spacer for fixed header */}
-      <div className="h-16 lg:h-20"></div>
+      <div className="h-16 sm:h-18 lg:h-22"></div>
     </>
   );
 };

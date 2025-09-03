@@ -2,7 +2,7 @@ import React from 'react'
 import HeroSection from "@/app/homepage/HeroSection"
 import ServiceShowcase from "@/app/components/service/service-showcase"
 import SocialProofSection from "@/app/homepage/SocialProofSection"
-import TransformationCarousel from "@/app/homepage/TransformationCarousel"
+//import TransformationCarousel from "@/app/homepage/TransformationCarousel"
 import TrustSignals from "@/app/homepage/TrustSignals"
 import { db } from "@/server"
 import { services } from "@/server/schema"
@@ -15,7 +15,6 @@ import { Star, Clock, Users, ArrowRight, Calendar, Scissors, Play, Eye, Zap, Awa
 import placeholder from "@/public/Barber2.jpg"
 
 const HomePage = async () => {
-  // Get featured services (top rated or most popular)
   const featuredServices = await db.query.services.findMany({
     where: eq(services.isActive, true),
     with: {
@@ -85,8 +84,7 @@ const HomePage = async () => {
       <HeroSection />
 
 
-      {/* Transformation Carousel */}
-      <TransformationCarousel />
+      
       
       {/* Featured Services Section - Your existing database-driven content */}
       <section className="py-20 bg-gradient-to-br from-slate-50 via-white to-slate-100">
@@ -366,43 +364,7 @@ const HomePage = async () => {
       {/* Trust Signals */}
       <TrustSignals />
 
-      {/* Ultra-Premium Call to Action Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-black py-20">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;0.03&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-10"></div>
-        
-        <div className="relative container mx-auto px-4 text-center space-y-8">
-          <div className="inline-flex items-center gap-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white px-6 py-3 rounded-full text-sm font-black shadow-xl">
-            <Award className="w-5 h-5" />
-            PREMIUM EXPERIENCE AWAITS
-            <Zap className="w-4 h-4" />
-          </div>
-          
-          <h2 className="text-5xl font-black text-white">
-            Ready for Your Transformation?
-          </h2>
-          <p className="text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed">
-            Book your appointment today and experience the artistry of our master barbers. 
-            Your signature style is waiting to be crafted.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
-            <Link 
-              href="/service"
-              className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-orange-600 hover:to-red-600 text-white font-black py-5 px-10 rounded-2xl transition-all duration-300 hover:shadow-2xl hover:shadow-orange-500/30 inline-flex items-center justify-center gap-3 group text-lg border border-orange-500"
-            >
-              <span>Explore All Services</span>
-              <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
-            </Link>
-            <Link 
-              href="/about"
-              className="border-2 border-white text-white hover:bg-white hover:text-slate-900 font-black py-5 px-10 rounded-2xl transition-all duration-300 inline-flex items-center justify-center gap-3 group text-lg hover:shadow-2xl hover:shadow-white/20"
-            >
-              <span>Meet Our Barbers</span>
-              <div className="w-2 h-2 bg-current rounded-full group-hover:w-8 transition-all duration-300"></div>
-            </Link>
-          </div>
-        </div>
-      </section>
+      
     </div>
   )
 }
