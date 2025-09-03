@@ -132,26 +132,26 @@ const Header = () => {
               : 'bg-gradient-to-b from-black/80 to-transparent backdrop-blur-sm'
           }`}
         >
-          <div className="w-full px-3 sm:px-4 lg:px-8">
-            <div className="flex items-center justify-between h-16 sm:h-18 lg:h-22">
-              {/* Logo - Simplified for mobile */}
+          <div className="w-full px-2 sm:px-4 lg:px-8">
+            <div className="flex items-center justify-between h-14 sm:h-18 lg:h-22">
+              {/* Logo - Ultra Mobile Optimized */}
               <Link 
                 href="/"
-                className="flex items-center cursor-pointer group min-w-0"
+                className="flex items-center cursor-pointer group min-w-0 flex-shrink-0"
               >
-                <div className="flex items-center space-x-2 sm:space-x-4">
+                <div className="flex items-center space-x-1.5 sm:space-x-4">
                   <div className="relative flex-shrink-0">
-                    <div className="w-8 h-8 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transition-all duration-500 border border-amber-300/30">
-                      <Scissors size={16} color="black" className="sm:w-6 sm:h-6 lg:w-7 lg:h-7 rotate-45 group-hover:rotate-90 transition-transform duration-500" />
+                    <div className="w-7 h-7 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transition-all duration-500 border border-amber-300/30">
+                      <Scissors size={14} color="black" className="sm:w-6 sm:h-6 lg:w-7 lg:h-7 rotate-45 group-hover:rotate-90 transition-transform duration-500" />
                     </div>
-                    <div className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded-full animate-pulse shadow-lg"></div>
+                    <div className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-2 h-2 sm:w-4 sm:h-4 bg-red-500 rounded-full animate-pulse shadow-lg"></div>
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="font-bold text-sm sm:text-xl lg:text-2xl text-white group-hover:text-amber-400 transition-colors duration-300 tracking-wide truncate">
+                    <span className="font-bold text-xs sm:text-xl lg:text-2xl text-white group-hover:text-amber-400 transition-colors duration-300 tracking-wide">
                       ELITE
                     </span>
-                    <span className="text-xs sm:text-sm text-amber-400 -mt-0.5 sm:-mt-1 font-medium  tracking-wider">
-                      BARBERSHOP
+                    <span className="text-[10px] sm:text-sm text-amber-400 -mt-0.5 sm:-mt-1 font-medium tracking-wider">
+                      CUTS
                     </span>
                   </div>
                 </div>
@@ -198,9 +198,9 @@ const Header = () => {
                 </div>
               </nav>
 
-              {/* Right Side - Mobile Optimized */}
+              {/* Right Side - Ultra Mobile Optimized */}
               <div className="flex items-center space-x-1 sm:space-x-4 flex-shrink-0">
-                {/* Call Button - Hidden on small mobile, icon only on medium */}
+                {/* Call Button - Responsive sizes */}
                 <Button
                   variant="outline"
                   className="hidden md:flex border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black font-semibold"
@@ -212,12 +212,12 @@ const Header = () => {
                   (555) 123-CUTS
                 </Button>
 
-                {/* Phone icon only for small screens */}
+                {/* Phone icon only for small screens - smaller size */}
                 <button
                   onClick={() => window.open('tel:+1555123CUTS')}
-                  className="md:hidden p-2 sm:p-3 rounded-lg border-2 border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black transition-all duration-300"
+                  className="md:hidden p-1 sm:p-3 rounded-lg border border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black transition-all duration-300"
                 >
-                  <Phone size={16} className="sm:w-5 sm:h-5" />
+                  <Phone size={10} className="sm:w-5 sm:h-5" />
                 </button>
 
                 {/* User Button */}
@@ -231,30 +231,30 @@ const Header = () => {
                 {status === 'unauthenticated' && (
                   <Button
                     variant="default"
-                    className="hidden sm:flex"
+                    className="hidden sm:flex text-sm px-3"
                     onClick={() => handleNavigation('/login')}
                     iconName={User}
                     iconPosition="left"
-                    iconSize={18}
+                    iconSize={16}
                   >
                     Sign In
                   </Button>
                 )}
 
-                {/* Mobile Menu Toggle */}
+                {/* Mobile Menu Toggle - Smaller size */}
                 <button
                   onClick={toggleMobileMenu}
-                  className="lg:hidden p-2 sm:p-3 rounded-lg text-white hover:text-amber-400 hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-amber-500/30 flex-shrink-0"
+                  className="lg:hidden p-1.5 sm:p-3 rounded-lg text-white hover:text-amber-400 hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-amber-500/30 flex-shrink-0"
                   aria-label="Toggle mobile menu"
                 >
-                  {isMobileMenuOpen ? <X size={20} className="sm:w-6 sm:h-6" /> : <Menu size={20} className="sm:w-6 sm:h-6" />}
+                  {isMobileMenuOpen ? <X size={18} className="sm:w-6 sm:h-6" /> : <Menu size={18} className="sm:w-6 sm:h-6" />}
                 </button>
               </div>
             </div>
           </div>
         </header>
         
-        <div className="h-16 sm:h-18 lg:h-22"></div>
+        <div className="h-14 sm:h-18 lg:h-22"></div>
       </>
     );
   }
@@ -268,25 +268,25 @@ const Header = () => {
             : 'bg-gradient-to-b from-black/80 to-transparent backdrop-blur-sm'
         }`}
       >
-        <div className="w-full px-3 sm:px-4 lg:px-8">
-          <div className="flex items-center justify-between h-16 sm:h-18 lg:h-22">
-            {/* Logo - Mobile Optimized */}
+        <div className="w-full px-2 sm:px-4 lg:px-8">
+          <div className="flex items-center justify-between h-14 sm:h-18 lg:h-22">
+            {/* Logo - Mobile Optimized with better spacing */}
             <Link 
               href="/"
-              className="flex items-center cursor-pointer group min-w-0 flex-shrink-0"
+              className="flex items-center cursor-pointer group min-w-0 flex-shrink-0 max-w-[45%] sm:max-w-none"
             >
-              <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="flex items-center space-x-1.5 sm:space-x-4">
                 <div className="relative flex-shrink-0">
-                  <div className="w-8 h-8 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transition-all duration-500 border border-amber-300/30">
-                    <Scissors size={16} color="black" className="sm:w-6 sm:h-6 lg:w-7 lg:h-7 rotate-45 group-hover:rotate-90 transition-transform duration-500" />
+                  <div className="w-7 h-7 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transition-all duration-500 border border-amber-300/30">
+                    <Scissors size={14} color="black" className="sm:w-6 sm:h-6 lg:w-7 lg:h-7 rotate-45 group-hover:rotate-90 transition-transform duration-500" />
                   </div>
-                  <div className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded-full animate-pulse shadow-lg"></div>
+                  <div className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-2 h-2 sm:w-4 sm:h-4 bg-red-500 rounded-full animate-pulse shadow-lg"></div>
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="font-bold text-sm sm:text-xl lg:text-2xl text-white group-hover:text-amber-400 transition-colors duration-300 tracking-wide">
+                  <span className="font-bold text-xs sm:text-xl lg:text-2xl text-white group-hover:text-amber-400 transition-colors duration-300 tracking-wide truncate">
                     ELITE CUTS
                   </span>
-                  <span className="text-xs sm:text-sm text-amber-400 -mt-0.5 sm:-mt-1 font-medium tracking-wider">
+                  <span className="text-[10px] sm:text-sm text-amber-400 -mt-0.5 sm:-mt-1 font-medium tracking-wider">
                     BARBERSHOP
                   </span>
                 </div>
@@ -346,57 +346,71 @@ const Header = () => {
               </div>
             </nav>
 
-            {/* Right Side - Mobile Responsive */}
-            <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-4 flex-shrink-0">
-              {/* Call Button - Responsive */}
+            {/* Right Side - Mobile Optimized with proper spacing */}
+            <div className="flex items-center gap-1 sm:gap-2 lg:gap-4 flex-shrink-0">
+              {/* Call Button - Desktop only */}
               <Button
                 variant="outline"
-                className="hidden lg:flex border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black font-semibold shadow-lg"
+                className="hidden lg:flex border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black font-semibold shadow-lg text-sm px-3 py-2"
                 onClick={() => window.open('tel:+1555123CUTS')}
                 iconName={Phone}
                 iconPosition="left"
-                iconSize={8}
+                iconSize={14}
               >
                 (555) 123-CUTS
               </Button>
 
-              {/* Phone icon only for medium screens */}
+              {/* Phone icon for tablets */}
               <button
                 onClick={() => window.open('tel:+1555123CUTS')}
                 className="hidden sm:flex lg:hidden p-2 rounded-lg border border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black transition-all duration-300"
                 title="Call us"
               >
-                <Phone size={8} />
+                <Phone size={16} />
               </button>
 
-              {/* User Button - Responsive */}
+              {/* Compact phone icon for mobile */}
+              <button
+                onClick={() => window.open('tel:+1555123CUTS')}
+                className="sm:hidden p-1.5 rounded-md border border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black transition-all duration-300 flex-shrink-0"
+                title="Call"
+                aria-label="Call us"
+              >
+                <Phone size={12} />
+              </button>
+
+              {/* User Button - Compact on mobile */}
               {status === 'authenticated' && session && (
-                <div className="flex items-center">
+                <div className="flex items-center scale-90 sm:scale-100">
                   <UserButton {...session} />
                 </div>
               )}
 
-              {/* Sign In Button - Hidden on small screens */}
+              {/* Sign In Button - Hidden on mobile */}
               {status === 'unauthenticated' && (
                 <Button
                   variant="default"
-                  className="hidden md:flex shadow-lg text-sm px-4"
+                  className="hidden sm:flex shadow-lg text-sm px-3 py-2"
                   onClick={() => handleNavigation('/login')}
                   iconName={User}
                   iconPosition="left"
-                  iconSize={16}
+                  iconSize={14}
                 >
                   Sign In
                 </Button>
               )}
 
-              {/* Mobile Menu Toggle - Always visible on mobile */}
+              {/* Mobile Menu Toggle - Optimized size */}
               <button
                 onClick={toggleMobileMenu}
-                className="lg:hidden p-2 rounded-lg text-white hover:text-amber-400 hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-amber-500/30 flex-shrink-0"
+                className="lg:hidden p-1.5 sm:p-2 rounded-lg text-white hover:text-amber-400 hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-amber-500/30 flex-shrink-0 min-w-[32px] sm:min-w-[40px]"
                 aria-label="Toggle mobile menu"
               >
-                {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                {isMobileMenuOpen ? (
+                  <X size={16} className="sm:w-5 sm:h-5" />
+                ) : (
+                  <Menu size={16} className="sm:w-5 sm:h-5" />
+                )}
               </button>
             </div>
           </div>
@@ -534,7 +548,7 @@ const Header = () => {
       )}
       
       {/* Spacer for fixed header */}
-      <div className="h-16 sm:h-18 lg:h-22"></div>
+      <div className="h-14 sm:h-18 lg:h-22"></div>
     </>
   );
 };
