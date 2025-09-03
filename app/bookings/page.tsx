@@ -151,10 +151,10 @@ export default async function BookingsPage() {
     bookingsList = []
   }
 
-  // Stats calculations
-  const totalRevenue = bookingsList.reduce((sum, booking) => sum + parseFloat(booking.totalPrice), 0)
-  const completedBookings = bookingsList.filter(b => b.status === 'completed').length
-  const averageRating = bookingsList.filter(b => b.rating).reduce((sum, b) => sum + (b.rating?.stars || 0), 0) / bookingsList.filter(b => b.rating).length || 0
+  // Stats calculations - FIXED: Only calculate revenue from completed bookings
+  const completedBookings = bookingsList.filter(b => b.status === 'completed')
+  const totalRevenue = completedBookings.reduce((sum, booking) => sum + parseFloat(booking.totalPrice), 0)
+  const averageRating = completedBookings.filter(b => b.rating).reduce((sum, b) => sum + (b.rating?.stars || 0), 0) / completedBookings.filter(b => b.rating).length || 0
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50">
@@ -237,7 +237,7 @@ export default async function BookingsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-green-700 text-xs md:text-sm font-medium">Completed</p>
-                      <p className="text-xl md:text-3xl font-bold text-green-900 mt-1">{completedBookings}</p>
+                      <p className="text-xl md:text-3xl font-bold text-green-900 mt-1">{completedBookings.length}</p>
                     </div>
                     <CheckCircle className="w-6 h-6 md:w-8 md:h-8 text-green-600" />
                   </div>

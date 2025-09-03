@@ -12,8 +12,8 @@ export default async function DashboardLayout({
 
   const userLinks = [
     {
-      label: "Orders",
-      path: "/dashboard/orders",
+      label: "Bookings",
+      path: "/bookings",
       icon: <Truck size={16} />,
     },
     {
