@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge"
 import { Star, Clock, Users, ArrowRight, Calendar, Scissors, Play, Eye, Zap, Award } from "lucide-react"
 import placeholder from "@/public/Barber2.jpg"
 
+export const revalidate = 30;
+
 const HomePage = async () => {
   const featuredServices = await db.query.services.findMany({
     where: eq(services.isActive, true),
@@ -95,7 +97,7 @@ const HomePage = async () => {
               YOUR SERVICES
               <Zap className="w-4 h-4" />
             </div>
-            <h2 className="text-5xl font-black text-slate-900 mb-6 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+            <h2 className="text-5xl font-black text-slate-900 mb-6 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text">
               Our Premium Services
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">

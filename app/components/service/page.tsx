@@ -15,6 +15,8 @@ export const metadata = {
   description: "Discover our range of professional barber services including haircuts, beard care, styling, and treatments.",
 }
 
+   export const revalidate = 30;
+
 export default async function ServicesPage() {
   // Enhanced querying like your product example
   const allServices = await db.query.services.findMany({
